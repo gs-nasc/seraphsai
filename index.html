@@ -77,6 +77,12 @@
             transform: translateY(-10px) scale(1.05);
             box-shadow: 0 10px 25px rgba(0,0,0,0.7);
         }
+        .card-icon {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
         .card-title {
             font-family: 'MedievalSharp', cursive;
             font-size: 1.5rem;
@@ -102,6 +108,7 @@
         .rarity-rare { border-color: #3498db; color: #3498db; }
         .rarity-mythic { border-color: #9b59b6; color: #9b59b6; }
         .rarity-legendary { border-color: #f1c40f; color: #f1c40f; }
+        .rarity-cursed { border-color: #e74c3c; color: #e74c3c; background: linear-gradient(45deg, #2c3e50, #34495e); }
         #chosen-cards-ui {
             background-color: rgba(0,0,0,0.4);
             padding: 10px;
@@ -211,6 +218,42 @@
             font-size: 14px;
             font-family: "Montserrat";
         }
+
+        /* --- Volume Sliders Lado a Lado --- */
+        .volume-changer {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 32px;
+            margin-top: 1.5rem;
+        }
+        .volume-slider-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+        }
+        .volume-label {
+            font-family: 'MedievalSharp', cursive;
+            color: #f1c40f;
+            font-size: 1.1rem;
+            margin-bottom: 2px;
+        }
+        .volume-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .volume-slider {
+            width: 120px;
+        }
+        .volume-value {
+            color: #fff;
+            font-family: 'Roboto', sans-serif;
+            font-size: 1rem;
+            min-width: 36px;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -229,13 +272,21 @@
                         <button id="lang-pt-btn" class="game-button bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-l-lg">PT-BR</button>
                         <button id="lang-en-btn" class="game-button bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-r-lg">EN</button>
                     </div>
-                    <div class="volume-changer mt-6">
-                        <label>Volume Música:</label>
-                        <input type="range" id="musicSlider" min="0" max="1" step="0.01" value="0.5">
-                        <span id="musicValue">50%</span>
-                        <label>Volume Efeitos:</label>
-                        <input type="range" id="fxSlider" min="0" max="1" step="0.01" value="0.7">
-                        <span id="fxValue">70%</span>
+                    <div class="volume-changer">
+                        <div class="volume-slider-group">
+                            <label for="musicSlider" class="volume-label" data-translate="music_volume">Volume Música:</label>
+                            <div class="volume-slider-row">
+                                <input type="range" id="musicSlider" min="0" max="1" step="0.01" value="0.5" class="volume-slider">
+                                <span id="musicValue" class="volume-value">50%</span>
+                            </div>
+                        </div>
+                        <div class="volume-slider-group">
+                            <label for="fxSlider" class="volume-label" data-translate="fx_volume">Volume Efeitos:</label>
+                            <div class="volume-slider-row">
+                                <input type="range" id="fxSlider" min="0" max="1" step="0.01" value="0.7" class="volume-slider">
+                                <span id="fxValue" class="volume-value">70%</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="controls-info mt-8 text-left text-gray-400">
                         <h3 class="text-xl font-medieval text-yellow-300 mb-2" data-translate="controls_title">Controls</h3>
@@ -461,6 +512,7 @@
         let isTrainingMode = false;
         let previousGameState = null;
         let finalScore = 0;
+        let currentLanguage = 'pt';
 
         // Leaderboard state
         let leaderboardLastDoc = null;
@@ -528,23 +580,29 @@
 
         const ALL_CARDS = [
             // Common
-            { id: 'growth', titleKey: 'card_growth_title', descriptionKey: 'card_growth_desc', rarity: rarities.COMMON, apply: p => { p.maxHealth += 10; p.health += 10; }, ascension: { threshold: 7, titleKey: 'asc_growth_title', descriptionKey: 'asc_growth_desc', apply: p => { p.healthRegen = 2; } } },
-            { id: 'swift', titleKey: 'card_swift_title', descriptionKey: 'card_swift_desc', rarity: rarities.COMMON, apply: p => { p.speed *= 1.20; } }, // Ascension for swift is complex, skipping for now
-            { id: 'catalyst', titleKey: 'card_catalyst_title', descriptionKey: 'card_catalyst_desc', rarity: rarities.COMMON, apply: p => { p.projectileDamage += 2; }, ascension: { threshold: 7, titleKey: 'asc_catalyst_title', descriptionKey: 'asc_catalyst_desc', apply: p => { p.projectileMaxBounces = 3; } } },
-            { id: 'focus', titleKey: 'card_focus_title', descriptionKey: 'card_focus_desc', rarity: rarities.COMMON, apply: p => { p.critChance += 0.05; }, ascension: { threshold: 7, titleKey: 'asc_focus_title', descriptionKey: 'asc_focus_desc', apply: p => { p.critDamage += 1.0; } } },
+            { id: 'growth', titleKey: 'card_growth_title', descriptionKey: 'card_growth_desc', rarity: rarities.COMMON, apply: p => { p.maxHealth += 10; p.health += 10; }, ascension: { threshold: 7, titleKey: 'asc_growth_title', descriptionKey: 'asc_growth_desc', apply: p => { p.healthRegen = 2; } }, icon: '💚' },
+            { id: 'swift', titleKey: 'card_swift_title', descriptionKey: 'card_swift_desc', rarity: rarities.COMMON, apply: p => { p.speed *= 1.20; }, icon: '💨' },
+            { id: 'catalyst', titleKey: 'card_catalyst_title', descriptionKey: 'card_catalyst_desc', rarity: rarities.COMMON, apply: p => { p.projectileDamage += 2; }, ascension: { threshold: 7, titleKey: 'asc_catalyst_title', descriptionKey: 'asc_catalyst_desc', apply: p => { p.projectileMaxBounces = 3; } }, icon: '⚗️' },
+            { id: 'focus', titleKey: 'card_focus_title', descriptionKey: 'card_focus_desc', rarity: rarities.COMMON, apply: p => { p.critChance += 0.05; }, ascension: { threshold: 7, titleKey: 'asc_focus_title', descriptionKey: 'asc_focus_desc', apply: p => { p.critDamage += 1.0; } }, icon: '🎯' },
+            
             // Uncommon
-            { id: 'resonance', titleKey: 'card_resonance_title', descriptionKey: 'card_resonance_desc', rarity: rarities.UNCOMMON, apply: p => { p.attackSpeed *= 0.88; }, ascension: { threshold: 7, titleKey: 'asc_resonance_title', descriptionKey: 'asc_resonance_desc', apply: p => { p.hasResonanceAscension = true; } } },
-            { id: 'charge', titleKey: 'card_charge_title', descriptionKey: 'card_charge_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSize *= 1.20; }, ascension: { threshold: 7, titleKey: 'asc_charge_title', descriptionKey: 'asc_charge_desc', apply: p => { p.projectilesPierce = true; } } },
-            { id: 'haste', titleKey: 'card_haste_title', descriptionKey: 'card_haste_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSpeedMultiplier = (p.projectileSpeedMultiplier || 1) * 1.2; }, ascension: { threshold: 5, titleKey: 'asc_haste_title', descriptionKey: 'asc_haste_desc', apply: p => { p.projectilesAccelerate = true; } } },
-            { id: 'gush', titleKey: 'card_gush_title', descriptionKey: 'card_gush_desc', rarity: rarities.UNCOMMON, apply: p => { p.maxJumps += 1; } },
+            { id: 'resonance', titleKey: 'card_resonance_title', descriptionKey: 'card_resonance_desc', rarity: rarities.UNCOMMON, apply: p => { p.attackSpeed *= 0.88; }, ascension: { threshold: 7, titleKey: 'asc_resonance_title', descriptionKey: 'asc_resonance_desc', apply: p => { p.hasResonanceAscension = true; } }, icon: '🌊' },
+            { id: 'charge', titleKey: 'card_charge_title', descriptionKey: 'card_charge_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSize *= 1.20; }, ascension: { threshold: 7, titleKey: 'asc_charge_title', descriptionKey: 'asc_charge_desc', apply: p => { p.projectilesPierce = true; } }, icon: '⚡' },
+            { id: 'haste', titleKey: 'card_haste_title', descriptionKey: 'card_haste_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSpeedMultiplier = (p.projectileSpeedMultiplier || 1) * 1.2; }, ascension: { threshold: 5, titleKey: 'asc_haste_title', descriptionKey: 'asc_haste_desc', apply: p => { p.projectilesAccelerate = true; } }, icon: '🚀' },
+            { id: 'gush', titleKey: 'card_gush_title', descriptionKey: 'card_gush_desc', rarity: rarities.UNCOMMON, apply: p => { p.maxJumps += 1; }, icon: '🏃' },
+            { id: 'bleeding', titleKey: 'card_bleeding_title', descriptionKey: 'card_bleeding_desc', rarity: rarities.UNCOMMON, apply: p => { p.bleedDamage = (p.bleedDamage || 0) + 3; p.bleedDuration = (p.bleedDuration || 0) + 2; }, ascension: { threshold: 5, titleKey: 'asc_bleeding_title', descriptionKey: 'asc_bleeding_desc', apply: p => { p.bleedDamage *= 1.5; p.bleedSpread = true; } }, icon: '🩸' },
+            { id: 'freezing', titleKey: 'card_freezing_title', descriptionKey: 'card_freezing_desc', rarity: rarities.UNCOMMON, apply: p => { p.freezeChance = (p.freezeChance || 0) + 0.15; p.freezeDuration = (p.freezeDuration || 0) + 1.5; }, ascension: { threshold: 4, titleKey: 'asc_freezing_title', descriptionKey: 'asc_freezing_desc', apply: p => { p.freezeChance += 0.1; p.iceShards = true; } }, icon: '🧊' },
+            
             // Rare
-            { id: 'leech', titleKey: 'card_leech_title', descriptionKey: 'card_leech_desc', rarity: rarities.RARE, apply: p => { p.lifeSteal += 0.03; } },
-            { id: 'precision', titleKey: 'card_precision_title', descriptionKey: 'card_precision_desc', rarity: rarities.RARE, apply: p => { p.critDamage += 0.5; } },
-            { id: 'shrink', titleKey: 'card_shrink_title', descriptionKey: 'card_shrink_desc', rarity: rarities.RARE, apply: p => { p.pixelScale *= 0.9; } },
-            { id: 'split_shot', titleKey: 'card_split_shot_title', descriptionKey: 'card_split_shot_desc', rarity: rarities.RARE, apply: p => { p.extraProjectiles = (p.extraProjectiles || 0) + 1; }, ascension: { threshold: 4, titleKey: 'asc_split_shot_title', descriptionKey: 'asc_split_shot_desc', apply: p => { p.extraProjectiles += 1; } } },
-            { id: 'greater_growth', titleKey: 'card_greater_growth_title', descriptionKey: 'card_greater_growth_desc', rarity: rarities.RARE, metaCardId: 'growth', apply: p => { const c = ALL_CARDS.find(x=>x.id==='growth'); c.apply(p); c.apply(p); p.chosenCards.growth = (p.chosenCards.growth || 0) + 2; } },
-            { id: 'greater_catalyst', titleKey: 'card_greater_catalyst_title', descriptionKey: 'card_greater_catalyst_desc', rarity: rarities.RARE, metaCardId: 'catalyst', apply: p => { const c = ALL_CARDS.find(x=>x.id==='catalyst'); c.apply(p); c.apply(p); p.chosenCards.catalyst = (p.chosenCards.catalyst || 0) + 2; } },
-            { id: 'arcane_orb', titleKey: 'card_arcane_orb_title', descriptionKey: 'card_arcane_orb_desc', descriptionKeyUpgrade: 'card_arcane_orb_desc_upgrade', rarity: rarities.RARE, apply: p => { p.arcaneOrbs.count++; }, ascension: { threshold: 5, titleKey: 'asc_arcane_orb_title', descriptionKey: 'asc_arcane_orb_desc', apply: p => { p.arcaneOrbs.powerUp = true; } } },
+            { id: 'leech', titleKey: 'card_leech_title', descriptionKey: 'card_leech_desc', rarity: rarities.RARE, apply: p => { p.lifeSteal += 0.03; }, icon: '🧛' },
+            { id: 'precision', titleKey: 'card_precision_title', descriptionKey: 'card_precision_desc', rarity: rarities.RARE, apply: p => { p.critDamage += 0.5; }, icon: '🔍' },
+            { id: 'shrink', titleKey: 'card_shrink_title', descriptionKey: 'card_shrink_desc', rarity: rarities.RARE, apply: p => { p.pixelScale *= 0.9; }, icon: '🔬' },
+            { id: 'split_shot', titleKey: 'card_split_shot_title', descriptionKey: 'card_split_shot_desc', rarity: rarities.RARE, apply: p => { p.extraProjectiles = (p.extraProjectiles || 0) + 1; }, ascension: { threshold: 4, titleKey: 'asc_split_shot_title', descriptionKey: 'asc_split_shot_desc', apply: p => { p.extraProjectiles += 1; } }, icon: '🔱' },
+            { id: 'greater_growth', titleKey: 'card_greater_growth_title', descriptionKey: 'card_greater_growth_desc', rarity: rarities.RARE, metaCardId: 'growth', apply: p => { const c = ALL_CARDS.find(x=>x.id==='growth'); c.apply(p); c.apply(p); p.chosenCards.growth = (p.chosenCards.growth || 0) + 2; }, icon: '💚💚' },
+            { id: 'greater_catalyst', titleKey: 'card_greater_catalyst_title', descriptionKey: 'card_greater_catalyst_desc', rarity: rarities.RARE, metaCardId: 'catalyst', apply: p => { const c = ALL_CARDS.find(x=>x.id==='catalyst'); c.apply(p); c.apply(p); p.chosenCards.catalyst = (p.chosenCards.catalyst || 0) + 2; }, icon: '⚗️⚗️' },
+            { id: 'arcane_orb', titleKey: 'card_arcane_orb_title', descriptionKey: 'card_arcane_orb_desc', descriptionKeyUpgrade: 'card_arcane_orb_desc_upgrade', rarity: rarities.RARE, apply: p => { p.arcaneOrbs.count++; }, ascension: { threshold: 5, titleKey: 'asc_arcane_orb_title', descriptionKey: 'asc_arcane_orb_desc', apply: p => { p.arcaneOrbs.powerUp = true; } }, icon: '🔮' },
+            { id: 'poison', titleKey: 'card_poison_title', descriptionKey: 'card_poison_desc', rarity: rarities.RARE, apply: p => { p.poisonDamage = (p.poisonDamage || 0) + 2; p.poisonDuration = (p.poisonDuration || 0) + 3; }, ascension: { threshold: 4, titleKey: 'asc_poison_title', descriptionKey: 'asc_poison_desc', apply: p => { p.poisonClouds = true; } }, icon: '☠️' },
+            
             // Mythic
             { 
                 id: 'barrier', 
@@ -561,7 +619,8 @@
                         p.barrierCooldown = Math.max(5000, p.barrierCooldown * 0.8);
                     }
                 },
-                ascension: { threshold: 5, titleKey: 'asc_barrier_title', descriptionKey: 'asc_barrier_desc', apply: p => { p.barrierReflects = true; } }
+                ascension: { threshold: 5, titleKey: 'asc_barrier_title', descriptionKey: 'asc_barrier_desc', apply: p => { p.barrierReflects = true; } },
+                icon: '🛡️'
             },
             { 
                 id: 'thunderbolt', 
@@ -579,7 +638,8 @@
                         p.thunderboltCount += 1;
                     }
                 },
-                ascension: { threshold: 5, titleKey: 'asc_thunderbolt_title', descriptionKey: 'asc_thunderbolt_desc', apply: p => { p.thunderboltLeavesAoe = true; } }
+                ascension: { threshold: 5, titleKey: 'asc_thunderbolt_title', descriptionKey: 'asc_thunderbolt_desc', apply: p => { p.thunderboltLeavesAoe = true; } },
+                icon: '⚡'
             },
             { 
                 id: 'chain_lightning', 
@@ -595,11 +655,15 @@
                         p.chainLightning.jumps++;
                     }
                 },
-                ascension: { threshold: 5, titleKey: 'asc_chain_lightning_title', descriptionKey: 'asc_chain_lightning_desc', apply: p => { p.chainLightning.fullDamage = true; p.chainLightning.jumps += 2; } }
+                ascension: { threshold: 5, titleKey: 'asc_chain_lightning_title', descriptionKey: 'asc_chain_lightning_desc', apply: p => { p.chainLightning.fullDamage = true; p.chainLightning.jumps += 2; } },
+                icon: '🌩️'
             },
+            { id: 'time_warp', titleKey: 'card_time_warp_title', descriptionKey: 'card_time_warp_desc', rarity: rarities.MYTHIC, apply: p => { p.timeWarpChance = (p.timeWarpChance || 0) + 0.1; }, ascension: { threshold: 3, titleKey: 'asc_time_warp_title', descriptionKey: 'asc_time_warp_desc', apply: p => { p.timeWarpDuration = 3; } }, icon: '⏰' },
+            
             // Legendary
-            { id: 'appraisal', titleKey: 'card_appraisal_title', descriptionKey: 'card_appraisal_desc', rarity: rarities.LEGENDARY, apply: p => { p.cardChoices += 1; } },
-            { id: 'immortal', titleKey: 'card_immortal_title', descriptionKey: 'card_immortal_desc', rarity: rarities.LEGENDARY, apply: p => { p.revives += 1; } },
+            { id: 'appraisal', titleKey: 'card_appraisal_title', descriptionKey: 'card_appraisal_desc', rarity: rarities.LEGENDARY, apply: p => { p.cardChoices += 1; }, icon: '📜' },
+            { id: 'immortal', titleKey: 'card_immortal_title', descriptionKey: 'card_immortal_desc', rarity: rarities.LEGENDARY, apply: p => { p.revives += 1; }, icon: '👼' },
+            { id: 'void_walker', titleKey: 'card_void_walker_title', descriptionKey: 'card_void_walker_desc', rarity: rarities.LEGENDARY, apply: p => { p.voidWalker = true; }, icon: '🌌' },
         ];
 
         const COMBINATIONS = [
@@ -630,6 +694,27 @@
                 descriptionKey: 'combo_orbital_barrage_desc',
                 required: [{ id: 'arcane_orb', count: 1 }, { id: 'resonance', count: 1 }],
                 apply: p => { p.attackSpeedAffectsOrbs = true; }
+            },
+            {
+                id: 'frostbite',
+                titleKey: 'combo_frostbite_title',
+                descriptionKey: 'combo_frostbite_desc',
+                required: [{ id: 'freezing', count: 1 }, { id: 'bleeding', count: 1 }],
+                apply: p => { p.frostbiteEffect = true; }
+            },
+            {
+                id: 'toxic_freeze',
+                titleKey: 'combo_toxic_freeze_title',
+                descriptionKey: 'combo_toxic_freeze_desc',
+                required: [{ id: 'poison', count: 1 }, { id: 'freezing', count: 1 }],
+                apply: p => { p.toxicFreezeEffect = true; }
+            },
+            {
+                id: 'blood_magic',
+                titleKey: 'combo_blood_magic_title',
+                descriptionKey: 'combo_blood_magic_desc',
+                required: [{ id: 'bleeding', count: 1 }, { id: 'leech', count: 1 }],
+                apply: p => { p.bloodMagicEffect = true; }
             }
         ];
         
@@ -675,6 +760,7 @@
                 const descriptionKey = isUpgrade && card.descriptionKeyUpgrade ? card.descriptionKeyUpgrade : card.descriptionKey;
 
                 cardEl.innerHTML = `
+                    <div class="card-icon">${card.icon || '🃏'}</div>
                     <div class="card-title">${translations[currentLanguage][card.titleKey] || card.titleKey} ${isUpgrade ? '+' : ''}</div>
                     <div class="card-description">${translations[currentLanguage][descriptionKey] || descriptionKey}</div>
                     <div class="card-rarity">${card.rarity}</div>
@@ -753,9 +839,22 @@
                 controls_auto_attack: "Toggle Auto-Attack",
                 controls_debug: "Debug Menu",
                 controls_training_only: "(Training Mode Only)",
+                music_volume: 'Music Volume',
+                fx_volume: 'FX Volume',
+                
+                // Existing cards
                 card_growth_title: "Growth", card_swift_title: "Swift", card_catalyst_title: "Catalyst", card_resonance_title: "Resonance", card_charge_title: "Charge", card_gush_title: "Gush", card_leech_title: "Leech", card_precision_title: "Precision", card_shrink_title: "Shrink", card_barrier_title: "Barrier", card_thunderbolt_title: "Thunderbolt", card_appraisal_title: "Appraisal", card_immortal_title: "Immortal",
                 card_focus_title: "Focus", card_split_shot_title: "Split Shot", card_chain_lightning_title: "Chain Lightning",
                 card_greater_growth_title: "Greater Growth", card_greater_catalyst_title: "Greater Catalyst", card_arcane_orb_title: "Arcane Orb", card_haste_title: "Haste",
+                
+                // New cards
+                card_bleeding_title: "Bleeding", card_bleeding_desc: "Attacks cause enemies to bleed, dealing damage over time.",
+                card_freezing_title: "Freezing", card_freezing_desc: "15% chance to freeze enemies, slowing them significantly.",
+                card_poison_title: "Poison", card_poison_desc: "Attacks poison enemies, dealing damage over time and reducing their damage.",
+                card_time_warp_title: "Time Warp", card_time_warp_desc: "10% chance to slow down time around you when taking damage.",
+                card_void_walker_title: "Void Walker", card_void_walker_desc: "Phase through enemies and projectiles briefly after dashing.",
+                
+                // Existing descriptions
                 card_growth_desc: "Max. HP +10", card_swift_desc: "Movement Speed +20%", card_catalyst_desc: "Projectile Damage +2", card_resonance_desc: "Atk Speed +12%", card_charge_desc: "Projectile Size +20%", card_gush_desc: "Adds +1 Jump", card_leech_desc: "Life Steal of 3% Damage", card_precision_desc: "Critical deals +50% damage", card_shrink_desc: "Makes you 10% smaller", 
                 card_focus_desc: "+5% Critical Hit Chance.", card_split_shot_desc: "Fires an additional projectile.",
                 card_chain_lightning_desc: "Projectiles have a 25% chance to chain to 1 nearby enemy.", card_chain_lightning_desc_upgrade: "Increases chain chance by 10% and adds +1 jump.",
@@ -763,6 +862,7 @@
                 card_barrier_desc: "Creates a shield that blocks damage once every 15s", card_barrier_desc_upgrade: "Reduces Barrier cooldown by 20%",
                 card_thunderbolt_desc: "Calls 2 thunderbolts from the skies every few seconds", card_thunderbolt_desc_upgrade: "Calls +1 thunderbolt from the skies",
                 card_appraisal_desc: "+1 item choice from now on", card_immortal_desc: "+1 Revive",
+                
                 // Ascensions
                 asc_growth_title: "Ascension: Regeneration", asc_growth_desc: "Passively regenerates 2 HP/sec.",
                 asc_resonance_title: "Ascension: Arcane Beam", asc_resonance_desc: "Replaces projectiles with a continuous beam of energy.",
@@ -775,11 +875,19 @@
                 asc_chain_lightning_title: "Ascension: Super Conductor", asc_chain_lightning_desc: "Chained projectiles deal full damage and can jump 2 more times.",
                 asc_arcane_orb_title: "Ascension: Orbital Power", asc_arcane_orb_desc: "Orbs are larger, faster, and deal more damage.",
                 asc_haste_title: "Ascension: Warp Speed", asc_haste_desc: "Projectiles accelerate over their lifetime.",
+                asc_bleeding_title: "Ascension: Hemorrhage", asc_bleeding_desc: "Bleeding damage increased by 50% and spreads to nearby enemies.",
+                asc_freezing_title: "Ascension: Absolute Zero", asc_freezing_desc: "Frozen enemies shatter, dealing area damage.",
+                asc_poison_title: "Ascension: Plague", asc_poison_desc: "Poisoned enemies leave toxic clouds when they die.",
+                asc_time_warp_title: "Ascension: Chronos", asc_time_warp_desc: "Time warp lasts 3 seconds and affects the entire screen.",
+                
                 // Combinations
                 combo_lightning_shield_title: "Combo: Stormguard", combo_lightning_shield_desc: "While Barrier is active, it periodically zaps nearby enemies.",
-                combo_arcane_explosion_title: "Combo: Explosão Arcana", combo_arcane_explosion_desc: "Projéteis explodem no impacto, causando 50% do dano em área.",
-                combo_chain_reaction_title: "Combo: Reação em Cadeia", combo_chain_reaction_desc: "Projéteis de Tiro Dividido também podem ativar o Raio em Cadeia.",
-                combo_orbital_barrage_title: "Combo: Barragem Orbital", combo_orbital_barrage_desc: "Sua velocidade de ataque também aumenta a velocidade de rotação dos orbes.",
+                combo_arcane_explosion_title: "Combo: Arcane Explosion", combo_arcane_explosion_desc: "Projectiles explode on impact, dealing 50% damage in area.",
+                combo_chain_reaction_title: "Combo: Chain Reaction", combo_chain_reaction_desc: "Split Shot projectiles can also trigger Chain Lightning.",
+                combo_orbital_barrage_title: "Combo: Orbital Barrage", combo_orbital_barrage_desc: "Attack speed also increases orb rotation speed.",
+                combo_frostbite_title: "Combo: Mordida de Gelo", combo_frostbite_desc: "Combina congelamento e sangramento para dano devastador ao longo do tempo.",
+                combo_toxic_freeze_title: "Combo: Gelo Tóxico", combo_toxic_freeze_desc: "Inimigos congelados também ficam envenenados, e veneno deixa inimigos lentos.",
+                combo_blood_magic_title: "Combo: Magia Sanguínea", combo_blood_magic_desc: "Inimigos sangrando fornecem roubo de vida adicional e regeneração de mana.",
                 combo_title: "Combinações",
             },
             pt: {
@@ -803,9 +911,22 @@
                 controls_auto_attack: "Alternar Ataque Automático",
                 controls_debug: "Menu de Depuração",
                 controls_training_only: "(Apenas Modo Treino)",
+                music_volume: 'Volume Música',
+                fx_volume: 'Volume Efeitos',
+                
+                // Existing cards
                 card_growth_title: "Crescimento", card_swift_title: "Rapidez", card_catalyst_title: "Catalisador", card_resonance_title: "Ressonância", card_charge_title: "Carga", card_gush_title: "Impulso", card_leech_title: "Sanguessuga", card_precision_title: "Precisão", card_shrink_title: "Encolher", card_barrier_title: "Barreira", card_thunderbolt_title: "Relâmpago", card_appraisal_title: "Avaliação", card_immortal_title: "Imortal",
                 card_focus_title: "Foco", card_split_shot_title: "Tiro Dividido", card_chain_lightning_title: "Raio em Cadeia",
                 card_greater_growth_title: "Crescimento Maior", card_greater_catalyst_title: "Catalisador Maior", card_arcane_orb_title: "Orbe Arcano", card_haste_title: "Aceleração",
+                
+                // New cards
+                card_bleeding_title: "Sangramento", card_bleeding_desc: "Ataques fazem inimigos sangrarem, causando dano ao longo do tempo.",
+                card_freezing_title: "Congelamento", card_freezing_desc: "15% de chance de congelar inimigos, deixando-os muito lentos.",
+                card_poison_title: "Veneno", card_poison_desc: "Ataques envenenam inimigos, causando dano ao longo do tempo e reduzindo seu dano.",
+                card_time_warp_title: "Distorção Temporal", card_time_warp_desc: "10% de chance de desacelerar o tempo ao redor ao receber dano.",
+                card_void_walker_title: "Caminhante do Vazio", card_void_walker_desc: "Atravessa inimigos e projéteis brevemente após usar dash.",
+                
+                // Existing descriptions
                 card_growth_desc: "Vida Máx. +10", card_swift_desc: "Velocidade de Movimento +20%", card_catalyst_desc: "Dano do Projétil +2", card_resonance_desc: "Vel. de Ataque +12%", card_charge_desc: "Tamanho do Projétil +20%", card_gush_desc: "Adiciona +1 Pulo", card_leech_desc: "Roubo de Vida de 3% do Dano", card_precision_desc: "Dano Crítico +50%", card_shrink_desc: "Deixa você 10% menor", 
                 card_focus_desc: "+5% de Chance de Acerto Crítico.", card_split_shot_desc: "Dispara um projétil adicional.",
                 card_chain_lightning_desc: "Projéteis têm 25% de chance de saltar para 1 inimigo próximo.", card_chain_lightning_desc_upgrade: "Aumenta a chance de saltar em 10% e adiciona +1 salto.",
@@ -813,6 +934,7 @@
                 card_barrier_desc: "Cria um escudo que bloqueia dano a cada 15s", card_barrier_desc_upgrade: "Reduz o tempo de recarga da Barreira em 20%",
                 card_thunderbolt_desc: "Chama 2 raios dos céus a cada poucos segundos", card_thunderbolt_desc_upgrade: "Chama +1 raio dos céus",
                 card_appraisal_desc: "+1 opção de item a partir de agora", card_immortal_desc: "+1 Revive",
+                
                 // Ascensions
                 asc_growth_title: "Ascensão: Regeneração", asc_growth_desc: "Regenera passivamente 2 de Vida/seg.",
                 asc_resonance_title: "Ascensão: Raio Arcano", asc_resonance_desc: "Substitui projéteis por um raio contínuo de energia.",
@@ -825,16 +947,23 @@
                 asc_chain_lightning_title: "Ascensão: Supercondutor", asc_chain_lightning_desc: "Raios em cadeia causam dano total e podem saltar mais 2 vezes.",
                 asc_arcane_orb_title: "Ascensão: Poder Orbital", asc_arcane_orb_desc: "Orbes são maiores, mais rápidos e causam mais dano.",
                 asc_haste_title: "Ascensão: Velocidade da Luz", asc_haste_desc: "Projéteis aceleram durante sua vida útil.",
+                asc_bleeding_title: "Ascensão: Hemorragia", asc_bleeding_desc: "Dano de sangramento aumentado em 50% e se espalha para inimigos próximos.",
+                asc_freezing_title: "Ascensão: Zero Absoluto", asc_freezing_desc: "Inimigos congelados se despedaçam, causando dano em área.",
+                asc_poison_title: "Ascensão: Praga", asc_poison_desc: "Inimigos envenenados deixam nuvens tóxicas ao morrer.",
+                asc_time_warp_title: "Ascensão: Cronos", asc_time_warp_desc: "Distorção temporal dura 3 segundos e afeta a tela inteira.",
+                
                 // Combinations
                 combo_lightning_shield_title: "Combo: Guarda-Tempestade", combo_lightning_shield_desc: "Enquanto a Barreira está ativa, ela periodicamente atinge inimigos próximos com raios.",
                 combo_arcane_explosion_title: "Combo: Explosão Arcana", combo_arcane_explosion_desc: "Projéteis explodem no impacto, causando 50% do dano em área.",
                 combo_chain_reaction_title: "Combo: Reação em Cadeia", combo_chain_reaction_desc: "Projéteis de Tiro Dividido também podem ativar o Raio em Cadeia.",
                 combo_orbital_barrage_title: "Combo: Barragem Orbital", combo_orbital_barrage_desc: "Sua velocidade de ataque também aumenta a velocidade de rotação dos orbes.",
+                combo_frostbite_title: "Combo: Mordida de Gelo", combo_frostbite_desc: "Combina congelamento e sangramento para dano devastador ao longo do tempo.",
+                combo_toxic_freeze_title: "Combo: Gelo Tóxico", combo_toxic_freeze_desc: "Inimigos congelados também ficam envenenados, e veneno deixa inimigos lentos.",
+                combo_blood_magic_title: "Combo: Magia Sanguínea", combo_blood_magic_desc: "Inimigos sangrando fornecem roubo de vida adicional e regeneração de mana.",
                 combo_title: "Combinações",
             }
         };
-        let currentLanguage = 'pt';
-        
+
         // =================================================================
         // JOGADOR
         // =================================================================
@@ -873,7 +1002,23 @@
             projectilesAccelerate: false,
             splitProjectilesChain: false,
             attackSpeedAffectsOrbs: false,
-            pixelScale: 2.0, // <-- Reduzido de 2.5 para 2.0
+            pixelScale: 2.0,
+            // New effects
+            bleedDamage: 0,
+            bleedDuration: 0,
+            bleedSpread: false,
+            freezeChance: 0,
+            freezeDuration: 0,
+            iceShards: false,
+            poisonDamage: 0,
+            poisonDuration: 0,
+            poisonClouds: false,
+            timeWarpChance: 0,
+            timeWarpDuration: 0,
+            voidWalker: false,
+            frostbiteEffect: false,
+            toxicFreezeEffect: false,
+            bloodMagicEffect: false,
         };
 
         // =================================================================
@@ -1530,25 +1675,155 @@
                 color: type.color, 
                 attackCooldown: type.attackCooldown ? type.attackCooldown + Math.random() * 1000 : null, 
                 lastAttackTime: 0,
+                // Initialize status effect properties
+                bleedStacks: 0,
+                bleedTimer: 0,
+                freezeTimer: 0,
+                poisonStacks: 0,
+                poisonTimer: 0,
+                speedMultiplier: 1.0,
+                damageMultiplier: 1.0,
+                canAttack: true,
                 ...type
             }); 
         };
+
+        function updateEnemyEffects(deltaTime) {
+            enemies.forEach(e => {
+                // Bleed effect
+                if (e.bleedStacks > 0) {
+                    e.bleedTimer -= deltaTime;
+                    if (e.bleedTimer <= 0) {
+                        const bleedDmg = e.bleedStacks * (player.bleedDamage || 1);
+                        e.health -= bleedDmg;
+                        spawnDamageNumber(bleedDmg, e.x + e.width / 2, e.y, '#ff0000', 18);
+                        
+                        // Blood magic effect
+                        if (player.bloodMagicEffect) {
+                            player.health = Math.min(player.maxHealth, player.health + bleedDmg * 0.1);
+                        }
+                        
+                        // Bleed spread
+                        if (player.bleedSpread) {
+                            enemies.forEach(otherE => {
+                                if (otherE !== e && Math.hypot(e.x - otherE.x, e.y - otherE.y) < 100) {
+                                    otherE.bleedStacks = Math.min(3, (otherE.bleedStacks || 0) + 1);
+                                    otherE.bleedTimer = player.bleedDuration || 2;
+                                }
+                            });
+                        }
+                        
+                        e.bleedTimer = 1.0; // Tick every second
+                        e.bleedStacks = Math.max(0, e.bleedStacks - 1);
+                    }
+                }
+                
+                // Freeze effect
+                if (e.freezeTimer > 0) {
+                    e.freezeTimer -= deltaTime;
+                    e.speedMultiplier = 0.1; // Very slow
+                    e.canAttack = false; // Prevent attacking while frozen
+                    
+                    // Ice shards effect
+                    if (e.freezeTimer <= 0 && player.iceShards) {
+                        createExplosion(e.x + e.width / 2, e.y + e.height / 2, '#00ffff');
+                        enemies.forEach(otherE => {
+                            if (otherE !== e && Math.hypot(e.x - otherE.x, e.y - otherE.y) < 80) {
+                                otherE.health -= 15;
+                                spawnDamageNumber(15, otherE.x + otherE.width / 2, otherE.y, '#00ffff', 20);
+                            }
+                        });
+                    }
+                } else {
+                    e.speedMultiplier = 1.0;
+                    e.canAttack = true; // Can attack again when not frozen
+                }
+                
+                // Poison effect
+                if (e.poisonStacks > 0) {
+                    e.poisonTimer -= deltaTime;
+                    if (e.poisonTimer <= 0) {
+                        const poisonDmg = e.poisonStacks * (player.poisonDamage || 1);
+                        e.health -= poisonDmg;
+                        spawnDamageNumber(poisonDmg, e.x + e.width / 2, e.y, '#00ff00', 18);
+                        e.poisonTimer = 1.0;
+                        e.poisonStacks = Math.max(0, e.poisonStacks - 1);
+                        e.damageMultiplier = 0.7; // Reduced damage while poisoned
+                    }
+                } else {
+                    e.damageMultiplier = 1.0;
+                }
+                
+                // Frostbite combo effect
+                if (player.frostbiteEffect && e.bleedStacks > 0 && e.freezeTimer > 0) {
+                    const frostbiteDmg = (player.bleedDamage || 1) * 2 * deltaTime;
+                    e.health -= frostbiteDmg;
+                    spawnDamageNumber(Math.ceil(frostbiteDmg), e.x + e.width / 2, e.y, '#ff00ff', 16);
+                }
+                
+                // Toxic freeze combo effect
+                if (player.toxicFreezeEffect && e.poisonStacks > 0) {
+                    e.speedMultiplier *= 0.5; // Additional slowdown from poison
+                }
+            });
+        }
+
+        function applyOnHitEffects(enemy, damage) {
+            // Bleed
+            if (player.bleedDamage > 0) {
+                enemy.bleedStacks = Math.min(5, (enemy.bleedStacks || 0) + 1);
+                enemy.bleedTimer = player.bleedDuration || 2;
+                spawnDamageNumber("BLEEDING", enemy.x + enemy.width / 2, enemy.y - 20, '#ff0000', 20);
+            }
+            
+            // Freeze
+            if (player.freezeChance > 0 && Math.random() < player.freezeChance) {
+                enemy.freezeTimer = player.freezeDuration || 1.5;
+                spawnDamageNumber("FROZEN", enemy.x + enemy.width / 2, enemy.y - 20, '#00ffff', 20);
+            }
+            
+            // Poison
+            if (player.poisonDamage > 0) {
+                enemy.poisonStacks = Math.min(3, (enemy.poisonStacks || 0) + 1);
+                enemy.poisonTimer = player.poisonDuration || 3;
+                spawnDamageNumber("POISONED", enemy.x + enemy.width / 2, enemy.y - 20, '#00ff00', 20);
+            }
+            
+            // Time warp on damage taken to player
+            if (player.timeWarpChance > 0 && Math.random() < player.timeWarpChance) {
+                // Implement time warp effect
+                enemies.forEach(e => {
+                    e.speedMultiplier = (e.speedMultiplier || 1) * 0.1;
+                    spawnDamageNumber("TIME WARP", e.x + e.width / 2, e.y - 20, '#ff00ff', 20);
+                });
+                setTimeout(() => {
+                    enemies.forEach(e => {
+                        e.speedMultiplier = 1.0;
+                        spawnDamageNumber("TIME RESTORED", e.x + e.width / 2, e.y - 20, '#00ff00', 20);
+                    });
+                }, (player.timeWarpDuration || 2) * 1000);
+            }
+        }
+
         function updateEnemies(timestamp, deltaTime) {
             enemies.forEach(e => {
+                // Apply speed multiplier from status effects
+                const effectiveSpeed = e.speed * (e.speedMultiplier || 1);
+                
                 if (e.attackType === 'melee') {
                     const angle = Math.atan2(player.y - e.y, player.x - e.x);
-                    e.vx = Math.cos(angle) * e.speed;
-                    e.vy = Math.sin(angle) * e.speed;
+                    e.vx = Math.cos(angle) * effectiveSpeed;
+                    e.vy = Math.sin(angle) * effectiveSpeed;
                     e.x += e.vx * deltaTime;
                     e.y += e.vy * deltaTime;
                 } else { // Ranged behavior
                     const hoverTargetY = canvas.height * (0.2 + Math.random() * 0.2);
                     if (e.y < hoverTargetY) e.y += e.vy * deltaTime;
                     
-                    e.x += e.vx * deltaTime;
+                    e.x += e.vx * deltaTime * (e.speedMultiplier || 1);
                     if (e.x < 10 || e.x + e.width > canvas.width - 10) e.vx *= -1;
 
-                    if (timestamp - e.lastAttackTime > e.attackCooldown) {
+                    if ((e.canAttack) && timestamp - e.lastAttackTime > e.attackCooldown) {
                         spawnEnemyProjectile(e.x + e.width / 2, e.y + e.height / 2, player.x + player.width / 2, player.y + player.height / 2, e);
                         e.lastAttackTime = timestamp;
                     }
@@ -1953,6 +2228,9 @@
                         e.health -= damageDealt;
                         spawnDamageNumber(damageDealt, e.x + e.width / 2, e.y, isCrit ? '#f1c40f' : 'white', isCrit ? 32 : 24);
 
+                        // Apply on-hit effects
+                        applyOnHitEffects(e, damageDealt);
+
                         if (player.lifeSteal > 0) player.health = Math.min(player.maxHealth, player.health + damageDealt * player.lifeSteal);
 
                         if (!player.projectilesPierce) {
@@ -1984,6 +2262,7 @@
                                     particles.push({ isLightningZap: true, life: 0.2, startX: currentTarget.x + currentTarget.width / 2, startY: currentTarget.y + currentTarget.height / 2, endX: nextTarget.x + nextTarget.width / 2, endY: nextTarget.y + nextTarget.height / 2, color: '#00ffff' });
                                     const currentChainDamage = Math.floor(chainDmg);
                                     nextTarget.health -= currentChainDamage;
+                                    applyOnHitEffects(nextTarget, currentChainDamage);
                                     spawnDamageNumber(currentChainDamage, nextTarget.x + nextTarget.width / 2, nextTarget.y, '#00ffff', 20);
                                     hitByChain.add(nextTarget);
                                     currentTarget = nextTarget;
@@ -2001,14 +2280,30 @@
                                 if (otherE !== e) {
                                     const dist = Math.hypot(p.x - (otherE.x + otherE.width / 2), p.y - (otherE.y + otherE.height / 2));
                                     if (dist < 80) // Explosion radius
-                                        otherE.health -= damageDealt / 2; // Explosion damage
-                                    spawnDamageNumber(Math.floor(damageDealt / 2), otherE.x + otherE.width / 2, otherE.y, '#ff8c00', 20);
+                                        otherE.health -= Math.floor(damageDealt / 2);
                                 }
                             });
                         }
 
                         if (e.health <= 0) {
                             playEnemyDeath();
+                            
+                            // Poison clouds on death
+                            if (player.poisonClouds && e.poisonStacks > 0) {
+                                for (let i = 0; i < 20; i++) {
+                                    particles.push({
+                                        x: e.x + e.width / 2,
+                                        y: e.y + e.height / 2,
+                                        vx: (Math.random() - 0.5) * 100,
+                                        vy: (Math.random() - 0.5) * 100,
+                                        size: Math.random() * 5 + 3,
+                                        color: '#00ff00',
+                                        life: Math.random() * 2 + 1,
+                                        isPoisonCloud: true
+                                    });
+                                }
+                            }
+                            
                             createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color);
                             enemies.splice(eIndex, 1);
                             player.xp += e.xp;
@@ -2021,7 +2316,8 @@
                         if (hit && !player.projectilesPierce) break; // break from enemies loop
                     }
                 }
-            }
+             }
+             
              enemyProjectiles.forEach((p, pIndex) => { if (!player.isInvulnerable && p.x > player.x && p.x < player.x + player.width && p.y > player.y && p.y < player.y + player.height) { if(player.hasBarrier && player.barrierReady) { player.barrierReady = false; player.lastBarrierTime = performance.now(); if (player.barrierReflects) { p.vx *= -1.5; p.vy *= -1.5; p.color = '#00ffff'; p.damage *= 2; projectiles.push(p); } } else { player.health -= p.damage; player.isInvulnerable = true; setTimeout(() => { player.isInvulnerable = false; }, 1000); } enemyProjectiles.splice(pIndex, 1); updateGameUI(); } });
              enemies.forEach(e => {
                  if (e.attackType === 'melee' && !player.isInvulnerable) {
@@ -2639,6 +2935,7 @@
                         handleJump();
                         updatePlayer(now, deltaTime);
                         updateOrbs(deltaTime);
+                        updateEnemyEffects(deltaTime);
                         updateProjectiles(deltaTime);
                         updateEnemyProjectiles(deltaTime);
                         updateEnemies(now, deltaTime);
@@ -2694,12 +2991,14 @@
                                     }
                                 }
                                 lastAttackTime = now;
+                           
                             } else if (player.extraProjectiles > 0) {
                                 playProjectile();
                                 const playerCenterX = player.x + player.width / 2;
                                 const playerCenterY = player.y + player.height / 2;
                                 const angle = Math.atan2(mouse.y - playerCenterY, mouse.x - playerCenterX);
                                 const staffTotalLength = 70; // From drawPlayer: 10 offset + 60 length
+
                                 
                                 const projectileStartX = playerCenterX + Math.cos(angle) * staffTotalLength;
                                 const projectileStartY = playerCenterY + Math.sin(angle) * staffTotalLength;
@@ -2753,6 +3052,7 @@
                 }
             }
         }
+
         function togglePause(pause) {
             if (pause) {
                 previousGameState = gameState;
