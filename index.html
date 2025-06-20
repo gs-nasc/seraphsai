@@ -2549,31 +2549,6 @@
             ctx.restore();
         }
 
-        function startArcadeMusic() {
-            if (!window.audioContext) {
-                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            const ctx = window.audioContext;
-            const melody = [220, 220, 330, 220, 440, 0, 440];
-            let startTime = ctx.currentTime;
-
-            melody.forEach((freq, i) => {
-                if (freq) {
-                    let osc = ctx.createOscillator();
-                    let gain = ctx.createGain();
-                    osc.type = 'square';
-                    osc.frequency.value = freq;
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    let noteDuration = 0.3;
-                    let time = startTime + i * noteDuration;
-                    osc.start(time);
-                    osc.stop(time + noteDuration);
-                }
-            });
-            setTimeout(startArcadeMusic, melody.length * 300);
-        }
-
         // =================================================================
         // LOOP PRINCIPAL
         // =================================================================
@@ -2714,7 +2689,6 @@
             // generateStaticTrees(); // já chamado em resizeCanvas
             updateUIText();
             await displayMainMenuLeaderboard();
-            startArcadeMusic();
             then = performance.now();
             gameLoop(then);
         };
