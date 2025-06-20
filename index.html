@@ -2739,6 +2739,76 @@
                 }
             }
         }
+        function togglePause(pause) {
+            if (pause) {
+                previousGameState = gameState;
+                gameState = 'PAUSED';
+                pauseMenu.classList.remove('hidden');
+                displayPauseMenuLeaderboard();
+            } else {
+                if (previousGameState) {
+                    gameState = previousGameState;
+                    previousGameState = null;
+                } else {
+                    gameState = 'PLAYING'; // Fallback
+                }
+                pauseMenu.classList.add('hidden');
+            }
+        }
+
+        async function displayPauseMenuLeaderboard() {
+            const container = document.getElementById('pause-menu-leaderboard');
+            const lang = translations[currentLanguage];
+            const title = lang.leaderboard_title || 'Leaderboard';
+            const q = query(leaderboardCollection, orderBy("score", "desc"), limit(MAX_LEADERBOARD_ENTRIES));
+            
+            try {
+                const querySnapshot = await getDocs(q);
+                const scores = [];
+                querySnapshot.forEach(doc => scores.push(doc.data()));
+                
+                container.innerHTML = `<h2 class="text-4xl font-medieval text-yellow-300 mb-6 text-center">${title}</h2>`;
+                
+                if (scores.length === 0) {
+                    container.innerHTML += `<p class="text-center text-gray-400">No scores yet. Be the first!</p>`;
+                } else {
+                    const list = document.createElement('ol');
+                    list.className = 'list-decimal list-inside space-y-2 text-lg';
+                    list.start = 1;
+                    scores.forEach(entry => {
+                        const item = document.createElement('li');
+                        item.className = 'flex justify-between items-center p-2 bg-gray-800 rounded';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'font-semibold text-white truncate pr-2';
+                        nameSpan.innerText = entry.name;
+
+                        const scoreAndDate = document.createElement('div');
+                        scoreAndDate.className = 'text-right flex-shrink-0';
+
+                        const scoreSpan = document.createElement('span');
+                        scoreSpan.className = 'font-bold text-yellow-400';
+                        scoreSpan.innerText = entry.score.toLocaleString();
+                        
+                        const dateSpan = document.createElement('span');
+                        dateSpan.className = 'text-sm text-gray-500 ml-4';
+                        dateSpan.innerText = new Date(entry.date).toLocaleDateString();
+
+                        scoreAndDate.appendChild(scoreSpan);
+                        scoreAndDate.appendChild(dateSpan);
+
+                        item.appendChild(nameSpan);
+                        item.appendChild(scoreAndDate);
+                        list.appendChild(item);
+                    });
+                    container.appendChild(list);
+                }
+            } catch (error) {
+                console.error("Error getting leaderboard from Firebase: ", error);
+                container.innerHTML += `<p class="text-center text-red-400">Error loading scores.</p>`;
+            }
+        }
+
 
         window.onload = async () => {
             resizeCanvas();
