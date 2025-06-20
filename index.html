@@ -2074,6 +2074,63 @@
             currentWave = 0; updateGameUI(); startNextWave(); 
         };
 
+        function populateDebugMenu() {
+            document.getElementById('debug-health').value = player.health;
+            document.getElementById('debug-maxHealth').value = player.maxHealth;
+            document.getElementById('debug-damage').value = player.projectileDamage;
+            document.getElementById('debug-speed').value = player.speed;
+            document.getElementById('debug-attackSpeed').value = player.attackSpeed;
+
+            debugCardList.innerHTML = '';
+            ALL_CARDS.forEach(card => {
+                const btn = document.createElement('button');
+                const title = translations[currentLanguage][card.titleKey] || card.titleKey;
+                btn.innerText = title;
+                btn.onclick = () => {
+                    card.apply(player);
+                    player.chosenCards[card.id] = (player.chosenCards[card.id] || 0) + 1;
+                    updateChosenCardsUI();
+                    updateGameUI();
+                };
+                debugCardList.appendChild(btn);
+            });
+
+            const debugAscensionList = document.getElementById('debug-ascension-list');
+            debugAscensionList.innerHTML = '';
+            ALL_CARDS.forEach(card => {
+                if (card.ascension) {
+                    const btn = document.createElement('button');
+                    const title = translations[currentLanguage][card.ascension.titleKey] || card.ascension.titleKey;
+                    btn.innerText = `Asc: ${title}`;
+                    btn.onclick = () => {
+                        if (!player.ascensions[card.id]) {
+                            card.ascension.apply(player);
+                            player.ascensions[card.id] = true;
+                            updateChosenCardsUI();
+                        }
+                    };
+                    debugAscensionList.appendChild(btn);
+                }
+            });
+
+            const debugComboList = document.getElementById('debug-combo-list');
+            debugComboList.innerHTML = '';
+            COMBINATIONS.forEach(combo => {
+                const btn = document.createElement('button');
+                const title = translations[currentLanguage][combo.titleKey] || combo.titleKey;
+                btn.innerText = `Combo: ${title}`;
+                btn.onclick = () => {
+                    if (!player.combinations[combo.id]) {
+                        combo.apply(player);
+                        player.combinations[combo.id] = true;
+                        updateChosenCardsUI();
+                    }
+                };
+                debugComboList.appendChild(btn);
+            });
+        }
+
+
         function toggleDebugMenu() {
             debugMode = !debugMode;
             if (debugMode) {
@@ -2689,6 +2746,7 @@
             // generateStaticTrees(); // já chamado em resizeCanvas
             updateUIText();
             await displayMainMenuLeaderboard();
+            startArcadeMusic();
             then = performance.now();
             gameLoop(then);
         };
