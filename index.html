@@ -1,0 +1,2809 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mago Rogue-like</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Roboto&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js" type="module"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #game-wrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: #2c3e50;
+            cursor: crosshair;
+        }
+        .font-medieval {
+            font-family: 'MedievalSharp', cursive;
+        }
+        .game-button {
+            transition: all 0.3s ease;
+        }
+        .game-button:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+        #wave-announcement {
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+        }
+        #wave-announcement.show {
+            opacity: 1;
+        }
+        /* --- Card Selection Screen --- */
+        #card-selection-screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+        }
+        .card {
+            background-color: #2c3e50;
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 10px;
+            width: 220px;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+        .card-title {
+            font-family: 'MedievalSharp', cursive;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        .card-description {
+            font-size: 0.9rem;
+            text-align: center;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-rarity {
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        /* Rarity Colors */
+        .rarity-common { border-color: #bdc3c7; color: #bdc3c7; }
+        .rarity-uncommon { border-color: #2ecc71; color: #2ecc71; }
+        .rarity-rare { border-color: #3498db; color: #3498db; }
+        .rarity-mythic { border-color: #9b59b6; color: #9b59b6; }
+        .rarity-legendary { border-color: #f1c40f; color: #f1c40f; }
+        #chosen-cards-ui {
+            background-color: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            text-shadow: 1px 1px 2px #000;
+            max-width: 250px;
+        }
+        .debug-section .debug-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .debug-section input {
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            padding: 2px 4px;
+            background-color: #2d3748;
+        }
+        #debug-card-list button {
+            width: 100%;
+            text-align: left;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #4a5568;
+            transition: background-color 0.2s;
+        }
+        #debug-card-list button:hover {
+            background-color: #718096;
+        }
+        #debug-card-list button, #debug-ascension-list button, #debug-combo-list button {
+            width: 100%;
+            text-align: left;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #4a5568;
+            transition: background-color 0.2s;
+        }
+        #debug-card-list button:hover, #debug-ascension-list button:hover, #debug-combo-list button:hover {
+            background-color: #718096;
+        }
+        /* --- Grimoire / Codex --- */
+        .grimoire-section { margin-bottom: 2rem; }
+        .grimoire-title { font-family: 'MedievalSharp', cursive; font-size: 2rem; color: #f1c40f; border-bottom: 2px solid #f1c40f; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        .grimoire-card { background-color: rgba(0,0,0,0.3); border-left: 4px solid #9b59b6; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
+        .grimoire-card-name { font-family: 'MedievalSharp', cursive; font-size: 1.5rem; }
+        .grimoire-card-desc { margin-top: 0.5rem; color: #bdc3c7; }
+        .grimoire-ascension { border-left-color: #f1c40f; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #f1c40f; }
+        .grimoire-ascension-name { color: #f1c40f; }
+        .grimoire-combo { border-left-color: #e74c3c; }
+        .grimoire-combo-reqs { font-style: italic; color: #95a5a6; margin-top: 0.5rem; }
+        
+        /* --- Name Input Screen --- */
+        #name-input-box {
+            background-color: #2c3e50;
+            padding: 40px;
+            border-radius: 12px;
+            border: 2px solid #f1c40f;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+        #name-input-field {
+            font-family: 'Roboto', sans-serif;
+            font-size: 1.5rem;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #bdc3c7;
+            background-color: #34495e;
+            color: white;
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        #leaderboard-pagination button {
+            background-color: #4a5568;
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+        #leaderboard-pagination button:hover:not(:disabled) {
+            background-color: #718096;
+        }
+        #leaderboard-pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .social {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+
+            color: white;
+
+            text-align: end;
+            font-weight: 600;
+            font-size: 14px;
+            font-family: "Montserrat";
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <!-- Menu Principal -->
+        <div id="main-menu" class="absolute inset-0 flex items-center justify-center z-10 bg-black bg-opacity-50 p-8">
+            <div class="flex w-full max-w-6xl mx-auto">
+                <!-- Left side: Menu buttons -->
+                <div class="w-1/2 text-center p-8 bg-black bg-opacity-70 rounded-lg shadow-2xl">
+                    <h1 class="text-6xl mb-8 font-medieval text-yellow-300" style="text-shadow: 2px 2px 4px #000;">Mago Rogue-like</h1>
+                    <button id="start-game-btn" data-translate="startGame" class="game-button w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Iniciar Jogo</button>
+                    <button id="training-mode-btn" data-translate="training_mode" class="game-button w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Modo Treino</button>
+                    <button id="grimoire-btn" data-translate="grimoire" class="game-button w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Grimório</button>
+                    <div class="language-selector mt-6">
+                        <button id="lang-pt-btn" class="game-button bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-l-lg">PT-BR</button>
+                        <button id="lang-en-btn" class="game-button bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-r-lg">EN</button>
+                    </div>
+                    <div class="controls-info mt-8 text-left text-gray-400">
+                        <h3 class="text-xl font-medieval text-yellow-300 mb-2" data-translate="controls_title">Controls</h3>
+                        <p><span class="font-bold text-white">A/D / ←/→</span>: <span data-translate="controls_move">Move</span></p>
+                        <p><span class="font-bold text-white">W / Space</span>: <span data-translate="controls_jump">Jump</span></p>
+                        <p><span class="font-bold text-white">Shift</span>: <span data-translate="controls_dash">Dash</span></p>
+                        <p><span class="font-bold text-white">Mouse</span>: <span data-translate="controls_aim">Aim</span></p>
+                        <p><span class="font-bold text-white">Click</span>: <span data-translate="controls_shoot">Shoot</span></p>
+                        <p><span class="font-bold text-white">Q</span>: <span data-translate="controls_auto_attack">Toggle Auto-Attack</span></p>
+                        <p><span class="font-bold text-white">P</span>: <span data-translate="controls_debug">Debug Menu</span> <span class="text-yellow-500" data-translate="controls_training_only">(Training Mode Only)</span></p>
+                    </div>
+                </div>
+                <!-- Right side: Leaderboard -->
+                <div id="main-menu-leaderboard" class="w-1/2 p-8 bg-black bg-opacity-70 rounded-lg shadow-2xl ml-8 text-white flex flex-col">
+                    <div id="leaderboard-content" class="flex-grow">
+                        <!-- Leaderboard content will be generated by JS -->
+                    </div>
+                    <div id="leaderboard-pagination" class="mt-auto text-center pt-4">
+                        <button id="leaderboard-prev-btn" class="hidden" data-translate="prev_page">Previous</button>
+                        <span id="leaderboard-page-indicator" class="mx-4 hidden">Page 1</span>
+                        <button id="leaderboard-next-btn" class="hidden" data-translate="next_page">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pause-menu" class="hidden absolute inset-0 flex items-center justify-center z-50 bg-black bg-opacity-70 p-8">
+            <div class="flex w-full max-w-6xl mx-auto">
+                <!-- Left side: Menu buttons -->
+                <div class="w-1/2 text-center p-8 bg-black bg-opacity-70 rounded-lg shadow-2xl">
+                    <h1 class="text-6xl mb-8 font-medieval text-yellow-300" data-translate="pause_title">Paused</h1>
+                    <button id="resume-btn" data-translate="resume" class="game-button w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Resume</button>
+                    <button id="pause-grimoire-btn" data-translate="grimoire" class="game-button w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Grimoire</button>
+                    <button id="quit-to-menu-btn" data-translate="quit_to_menu" class="game-button w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-2xl mb-4 shadow-lg">Quit to Menu</button>
+                </div>
+                <!-- Right side: Leaderboard -->
+                <div id="pause-menu-leaderboard" class="w-1/2 p-8 bg-black bg-opacity-70 rounded-lg shadow-2xl ml-8 text-white flex flex-col">
+                    <!-- Leaderboard content will be generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Jogo -->
+        <div id="game-container" class="w-full h-full">
+             <canvas id="gameCanvas"></canvas>
+            
+            <div id="wave-announcement" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl font-medieval text-white pointer-events-none"></div>
+
+            <div id="game-ui" class="absolute top-0 left-0 p-4 text-white w-full h-full pointer-events-none">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-lg font-bold" data-translate="health">Vida</div>
+                        <div class="w-64 h-6 bg-gray-700 rounded-full overflow-hidden border-2 border-gray-500"><div id="health-bar" class="bg-red-500 h-full transition-all duration-300"></div></div>
+                        <div class="text-lg font-bold mt-2" data-translate="xp">XP</div>
+                        <div class="w-64 h-4 bg-gray-700 rounded-full overflow-hidden border-2 border-gray-500"><div id="xp-bar" class="bg-purple-500 h-full transition-all duration-300"></div></div>
+                        <div id="player-level" class="text-lg font-bold mt-2">Nível: 1</div>
+                    </div>
+                    <div id="auto-attack-icon" class="hidden text-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="cyan" stroke-width="2" class="mx-auto"><path d="M14.5 13.5L18 2H6l3.5 11.5M11 13.5V22M9 22h4"></path></svg><span class="text-xs text-cyan-400">AUTO: ON</span></div>
+                    <div class="text-right">
+                        <div id="training-mode-indicator" class="hidden text-lg font-bold text-yellow-400" data-translate="training_mode">Modo Treino</div>
+                        <div class="text-2xl font-bold" data-translate="score">Pontos</div>
+                        <div id="score-counter" class="text-4xl font-medieval">0</div>
+                        <div class="text-2xl font-bold mt-2" data-translate="wave">Wave</div>
+                        <div id="wave-counter" class="text-4xl font-medieval">0</div>
+                    </div>
+                </div>
+                <div id="chosen-cards-ui" class="absolute bottom-4 right-4 text-right text-white text-sm">
+                </div>
+            </div>
+        </div>
+
+         <!-- Tela de Seleção de Cartas -->
+        <div id="card-selection-screen" class="hidden flex flex-col justify-center items-center">
+            <h2 id="card-selection-title" class="text-5xl font-medieval text-yellow-300 mb-8"></h2>
+            <div id="card-options" class="flex flex-wrap justify-center"></div>
+        </div>
+
+        <!-- Grimoire / Codex -->
+        <div id="grimoire-screen" class="hidden absolute inset-0 z-[250] bg-gray-900 bg-opacity-95 text-white p-8 overflow-y-auto">
+            <h1 class="text-5xl font-medieval text-center text-yellow-300 mb-8" data-translate="grimoire_title">Grimório de Ascensões</h1>
+            <button id="close-grimoire-btn" class="absolute top-4 right-4 text-4xl font-bold">&times;</button>
+            
+            <!-- Abas do Grimório -->
+            <div class="flex justify-center mb-8">
+                <button id="grimoire-tab-ascensions" class="game-button bg-purple-700 text-white font-bold py-2 px-6 rounded-l-lg border-r-2 border-purple-900">Ascensões</button>
+                <button id="grimoire-tab-monsters" class="game-button bg-green-700 text-white font-bold py-2 px-6 rounded-r-lg border-l-2 border-green-900">Monstros</button>
+            </div>
+            <div id="grimoire-content" class="max-w-4xl mx-auto">
+                <!-- Content will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- Menu de Debug -->
+        <div id="debug-menu" class="hidden absolute top-4 left-4 bg-gray-900 bg-opacity-80 text-white p-4 rounded-lg z-[200] w-80 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-medieval mb-4">Debug Menu</h2>
+            
+            <div class="debug-section">
+                <h3 class="font-bold mb-2">Player Stats</h3>
+                <div class="debug-stat"><label>Health:</label> <input id="debug-health" type="number" class="w-24 text-right"></div>
+                <div class="debug-stat"><label>Max Health:</label> <input id="debug-maxHealth" type="number" class="w-24 text-right"></div>
+                <div class="debug-stat"><label>Damage:</label> <input id="debug-damage" type="number" class="w-24 text-right"></div>
+                <div class="debug-stat"><label>Speed:</label> <input id="debug-speed" type="number" class="w-24 text-right"></div>
+                <div class="debug-stat"><label>Atk Speed (ms):</label> <input id="debug-attackSpeed" type="number" class="w-24 text-right"></div>
+                <button id="apply-stats-btn" class="game-button bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded mt-2 text-sm">Apply Stats</button>
+            </div>
+
+            <div class="debug-section mt-4">
+                <h3 class="font-bold mb-2">Add Cards</h3>
+                <div id="debug-card-list" class="flex flex-col space-y-1"></div>
+            </div>
+
+            <div class="debug-section mt-4">
+                <h3 class="font-bold mb-2">Add Ascensions</h3>
+                <div id="debug-ascension-list" class="flex flex-col space-y-1"></div>
+            </div>
+
+            <div class="debug-section mt-4">
+                <h3 class="font-bold mb-2">Add Combinations</h3>
+                <div id="debug-combo-list" class="flex flex-col space-y-1"></div>
+            </div>
+        </div>
+
+        <!-- Tela de Inserir Nome -->
+        <div id="name-input-screen" class="hidden flex flex-col justify-center items-center absolute inset-0 z-[150] bg-black bg-opacity-80">
+            <div id="name-input-box">
+                <h2 id="name-input-title" class="text-4xl font-medieval text-yellow-300 mb-4" data-translate="game_over">Game Over</h2>
+                <p id="name-input-prompt" data-translate="enter_name_prompt">Enter your name for the leaderboard:</p>
+                <input type="text" id="name-input-field" maxlength="15" placeholder="Mage">
+                <button id="submit-name-btn" data-translate="submit_score" class="game-button bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-xl mt-4">Submit Score</button>
+            </div>
+        </div>
+
+        <div class="social">
+            <ul>
+                <!-- <li class="hoverable">
+                    <a href="https://github.com/gs-nasc" target="_blank">Experiments ↗</a>
+                </li> -->
+                <li class="hoverable">
+                    <a href="https://www.awwwards.com/szhate/" target="_blank">
+                        Awwwards ↗
+                    </a>
+                </li>
+                <li class="hoverable">
+                    <a href="https://github.com/gs-nasc" target="_blank">Github ↗</a>
+                </li>
+                <li class="hoverable">
+                    <a href="https://instagram.com/hate.sz" target="_blank">Instagram ↗</a>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Importações do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, startAfter, endBefore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // TODO: Substitua com a configuração do seu projeto Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyA1RdisV5nNyZLUpuR8Gu4Uvc0hHQpRVtQ",
+          authDomain: "seraphai-62232.firebaseapp.com",
+          projectId: "seraphai-62232",
+          storageBucket: "seraphai-62232.firebasestorage.app",
+          messagingSenderId: "306089503542",
+          appId: "1:306089503542:web:b8b35ecae22aa3c2d92197"
+        };
+
+        // Inicializa o Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const leaderboardCollection = collection(db, 'leaderboard');
+
+        // =================================================================
+        // SETUP & VARIÁVEIS GLOBAIS
+        // =================================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const mainMenu = document.getElementById('main-menu');
+        const gameContainer = document.getElementById('game-container');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const trainingModeBtn = document.getElementById('training-mode-btn');
+        const grimoireBtn = document.getElementById('grimoire-btn');
+        const grimoireScreen = document.getElementById('grimoire-screen');
+        const closeGrimoireBtn = document.getElementById('close-grimoire-btn');
+        const langPtBtn = document.getElementById('lang-pt-btn');
+        const langEnBtn = document.getElementById('lang-en-btn');
+        const waveAnnouncement = document.getElementById('wave-announcement');
+        const autoAttackIcon = document.getElementById('auto-attack-icon');
+        const cardSelectionScreen = document.getElementById('card-selection-screen');
+        const cardSelectionTitle = document.getElementById('card-selection-title');
+        const cardOptionsContainer = document.getElementById('card-options');
+        const debugMenu = document.getElementById('debug-menu');
+        const applyStatsBtn = document.getElementById('apply-stats-btn');
+        const debugCardList = document.getElementById('debug-card-list');
+        const mainMenuLeaderboard = document.getElementById('main-menu-leaderboard');
+        const scoreCounter = document.getElementById('score-counter');
+        const pauseMenu = document.getElementById('pause-menu');
+        const resumeBtn = document.getElementById('resume-btn');
+        const pauseGrimoireBtn = document.getElementById('pause-grimoire-btn');
+        const quitToMenuBtn = document.getElementById('quit-to-menu-btn');
+        const trainingModeIndicator = document.getElementById('training-mode-indicator');
+        
+        // Name Input Screen Elements
+        const nameInputScreen = document.getElementById('name-input-screen');
+        const nameInputField = document.getElementById('name-input-field');
+        const submitNameBtn = document.getElementById('submit-name-btn');
+
+        // Leaderboard Pagination Elements
+        const leaderboardContent = document.getElementById('leaderboard-content');
+        const leaderboardPrevBtn = document.getElementById('leaderboard-prev-btn');
+        const leaderboardNextBtn = document.getElementById('leaderboard-next-btn');
+        const leaderboardPageIndicator = document.getElementById('leaderboard-page-indicator');
+
+        let gameState = 'MENU';
+        const keys = {};
+        const mouse = { x: 0, y: 0, down: false };
+        let projectiles = [], enemyProjectiles = [], enemies = [], particles = [], damageNumbers = [], platforms = [];
+        let autoAttack = false, lastAttackTime = 0, currentWave = 0, waveInProgress = false;
+        let allEnemiesSpawned = false;
+        let debugMode = false;
+        let isTrainingMode = false;
+        let previousGameState = null;
+        let finalScore = 0;
+
+        // Leaderboard state
+        let leaderboardLastDoc = null;
+        let leaderboardFirstDoc = null;
+        let leaderboardPage = 1;
+
+        // Game Loop timing
+        const MAX_FPS = 144;
+        const FPS_INTERVAL = 1000 / MAX_FPS;
+        let then = 0;
+
+        // =================================================================
+        // CARD DATABASE & LOGIC
+        // =================================================================
+        const rarities = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', MYTHIC: 'mythic', LEGENDARY: 'legendary' };
+        
+        const enemyTypes = {
+            GRUNT: {
+                color: '#c0392b',
+                healthMultiplier: 1,
+                size: 30,
+                speed: 100,
+                attackType: 'ranged',
+                attackCooldown: 2000,
+                projectileSpeed: 400,
+                projectileDamage: 10,
+                xp: 15,
+                points: 150,
+            },
+            TANK: {
+                color: '#8e44ad',
+                healthMultiplier: 3.5,
+                size: 50,
+                speed: 60,
+                attackType: 'ranged',
+                attackCooldown: 3500,
+                projectileSpeed: 300,
+                projectileDamage: 15,
+                xp: 30,
+                points: 300,
+            },
+            RUSHER: {
+                color: '#27ae60',
+                healthMultiplier: 0.8,
+                size: 25,
+                speed: 250,
+                attackType: 'melee',
+                damage: 15,
+                xp: 20,
+                points: 200,
+            },
+            SNIPER: {
+                color: '#f1c40f',
+                healthMultiplier: 0.7,
+                size: 28,
+                speed: 80,
+                attackType: 'ranged',
+                attackCooldown: 3000,
+                projectileSpeed: 800,
+                projectileDamage: 20,
+                xp: 25,
+                points: 250,
+            }
+        };
+
+        const ALL_CARDS = [
+            // Common
+            { id: 'growth', titleKey: 'card_growth_title', descriptionKey: 'card_growth_desc', rarity: rarities.COMMON, apply: p => { p.maxHealth += 10; p.health += 10; }, ascension: { threshold: 7, titleKey: 'asc_growth_title', descriptionKey: 'asc_growth_desc', apply: p => { p.healthRegen = 2; } } },
+            { id: 'swift', titleKey: 'card_swift_title', descriptionKey: 'card_swift_desc', rarity: rarities.COMMON, apply: p => { p.speed *= 1.20; } }, // Ascension for swift is complex, skipping for now
+            { id: 'catalyst', titleKey: 'card_catalyst_title', descriptionKey: 'card_catalyst_desc', rarity: rarities.COMMON, apply: p => { p.projectileDamage += 2; }, ascension: { threshold: 7, titleKey: 'asc_catalyst_title', descriptionKey: 'asc_catalyst_desc', apply: p => { p.projectileMaxBounces = 3; } } },
+            { id: 'focus', titleKey: 'card_focus_title', descriptionKey: 'card_focus_desc', rarity: rarities.COMMON, apply: p => { p.critChance += 0.05; }, ascension: { threshold: 7, titleKey: 'asc_focus_title', descriptionKey: 'asc_focus_desc', apply: p => { p.critDamage += 1.0; } } },
+            // Uncommon
+            { id: 'resonance', titleKey: 'card_resonance_title', descriptionKey: 'card_resonance_desc', rarity: rarities.UNCOMMON, apply: p => { p.attackSpeed *= 0.88; }, ascension: { threshold: 7, titleKey: 'asc_resonance_title', descriptionKey: 'asc_resonance_desc', apply: p => { p.hasResonanceAscension = true; } } },
+            { id: 'charge', titleKey: 'card_charge_title', descriptionKey: 'card_charge_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSize *= 1.20; }, ascension: { threshold: 7, titleKey: 'asc_charge_title', descriptionKey: 'asc_charge_desc', apply: p => { p.projectilesPierce = true; } } },
+            { id: 'haste', titleKey: 'card_haste_title', descriptionKey: 'card_haste_desc', rarity: rarities.UNCOMMON, apply: p => { p.projectileSpeedMultiplier = (p.projectileSpeedMultiplier || 1) * 1.2; }, ascension: { threshold: 5, titleKey: 'asc_haste_title', descriptionKey: 'asc_haste_desc', apply: p => { p.projectilesAccelerate = true; } } },
+            { id: 'gush', titleKey: 'card_gush_title', descriptionKey: 'card_gush_desc', rarity: rarities.UNCOMMON, apply: p => { p.maxJumps += 1; } },
+            // Rare
+            { id: 'leech', titleKey: 'card_leech_title', descriptionKey: 'card_leech_desc', rarity: rarities.RARE, apply: p => { p.lifeSteal += 0.03; } },
+            { id: 'precision', titleKey: 'card_precision_title', descriptionKey: 'card_precision_desc', rarity: rarities.RARE, apply: p => { p.critDamage += 0.5; } },
+            { id: 'shrink', titleKey: 'card_shrink_title', descriptionKey: 'card_shrink_desc', rarity: rarities.RARE, apply: p => { p.pixelScale *= 0.9; } },
+            { id: 'split_shot', titleKey: 'card_split_shot_title', descriptionKey: 'card_split_shot_desc', rarity: rarities.RARE, apply: p => { p.extraProjectiles = (p.extraProjectiles || 0) + 1; }, ascension: { threshold: 4, titleKey: 'asc_split_shot_title', descriptionKey: 'asc_split_shot_desc', apply: p => { p.extraProjectiles += 1; } } },
+            { id: 'greater_growth', titleKey: 'card_greater_growth_title', descriptionKey: 'card_greater_growth_desc', rarity: rarities.RARE, metaCardId: 'growth', apply: p => { const c = ALL_CARDS.find(x=>x.id==='growth'); c.apply(p); c.apply(p); p.chosenCards.growth = (p.chosenCards.growth || 0) + 2; } },
+            { id: 'greater_catalyst', titleKey: 'card_greater_catalyst_title', descriptionKey: 'card_greater_catalyst_desc', rarity: rarities.RARE, metaCardId: 'catalyst', apply: p => { const c = ALL_CARDS.find(x=>x.id==='catalyst'); c.apply(p); c.apply(p); p.chosenCards.catalyst = (p.chosenCards.catalyst || 0) + 2; } },
+            { id: 'arcane_orb', titleKey: 'card_arcane_orb_title', descriptionKey: 'card_arcane_orb_desc', descriptionKeyUpgrade: 'card_arcane_orb_desc_upgrade', rarity: rarities.RARE, apply: p => { p.arcaneOrbs.count++; }, ascension: { threshold: 5, titleKey: 'asc_arcane_orb_title', descriptionKey: 'asc_arcane_orb_desc', apply: p => { p.arcaneOrbs.powerUp = true; } } },
+            // Mythic
+            { 
+                id: 'barrier', 
+                titleKey: 'card_barrier_title', 
+                descriptionKey: 'card_barrier_desc', 
+                descriptionKeyUpgrade: 'card_barrier_desc_upgrade',
+                rarity: rarities.MYTHIC, 
+                apply: p => { 
+                    if (!p.hasBarrier) {
+                        p.hasBarrier = true; 
+                        p.barrierCooldown = 15000; 
+                        p.lastBarrierTime = 0; 
+                    } else {
+                        p.barrierCooldown = Math.max(5000, p.barrierCooldown * 0.8);
+                    }
+                },
+                ascension: { threshold: 5, titleKey: 'asc_barrier_title', descriptionKey: 'asc_barrier_desc', apply: p => { p.barrierReflects = true; } }
+            },
+            { 
+                id: 'thunderbolt', 
+                titleKey: 'card_thunderbolt_title', 
+                descriptionKey: 'card_thunderbolt_desc', 
+                descriptionKeyUpgrade: 'card_thunderbolt_desc_upgrade',
+                rarity: rarities.MYTHIC, 
+                apply: p => { 
+                    if (!p.hasThunderbolt) {
+                        p.hasThunderbolt = true; 
+                        p.thunderboltCooldown = 5000;
+                        p.thunderboltCount = 2;
+                        p.lastThunderboltTime = 0;
+                    } else {
+                        p.thunderboltCount += 1;
+                    }
+                },
+                ascension: { threshold: 5, titleKey: 'asc_thunderbolt_title', descriptionKey: 'asc_thunderbolt_desc', apply: p => { p.thunderboltLeavesAoe = true; } }
+            },
+            { 
+                id: 'chain_lightning', 
+                titleKey: 'card_chain_lightning_title', 
+                descriptionKey: 'card_chain_lightning_desc', 
+                descriptionKeyUpgrade: 'card_chain_lightning_desc_upgrade',
+                rarity: rarities.MYTHIC, 
+                apply: p => { 
+                    if (!p.chainLightning) {
+                        p.chainLightning = { chance: 0.25, jumps: 1, fullDamage: false };
+                    } else {
+                        p.chainLightning.chance = Math.min(1.0, p.chainLightning.chance + 0.1);
+                        p.chainLightning.jumps++;
+                    }
+                },
+                ascension: { threshold: 5, titleKey: 'asc_chain_lightning_title', descriptionKey: 'asc_chain_lightning_desc', apply: p => { p.chainLightning.fullDamage = true; p.chainLightning.jumps += 2; } }
+            },
+            // Legendary
+            { id: 'appraisal', titleKey: 'card_appraisal_title', descriptionKey: 'card_appraisal_desc', rarity: rarities.LEGENDARY, apply: p => { p.cardChoices += 1; } },
+            { id: 'immortal', titleKey: 'card_immortal_title', descriptionKey: 'card_immortal_desc', rarity: rarities.LEGENDARY, apply: p => { p.revives += 1; } },
+        ];
+
+        const COMBINATIONS = [
+            {
+                id: 'lightning_shield',
+                titleKey: 'combo_lightning_shield_title',
+                descriptionKey: 'combo_lightning_shield_desc',
+                required: [{ id: 'thunderbolt', count: 1 }, { id: 'barrier', count: 1 }],
+                apply: p => { p.hasLightningShield = true; }
+            },
+            {
+                id: 'arcane_explosion',
+                titleKey: 'combo_arcane_explosion_title',
+                descriptionKey: 'combo_arcane_explosion_desc',
+                required: [{ id: 'charge', count: 1 }, { id: 'catalyst', count: 1 }],
+                apply: p => { p.projectilesExplode = true; }
+            },
+            {
+                id: 'chain_reaction',
+                titleKey: 'combo_chain_reaction_title',
+                descriptionKey: 'combo_chain_reaction_desc',
+                required: [{ id: 'chain_lightning', count: 1 }, { id: 'split_shot', count: 1 }],
+                apply: p => { p.splitProjectilesChain = true; }
+            },
+            {
+                id: 'orbital_barrage',
+                titleKey: 'combo_orbital_barrage_title',
+                descriptionKey: 'combo_orbital_barrage_desc',
+                required: [{ id: 'arcane_orb', count: 1 }, { id: 'resonance', count: 1 }],
+                apply: p => { p.attackSpeedAffectsOrbs = true; }
+            }
+        ];
+        
+        function getCardsByRarity(count) {
+            const rarityWeights = {
+                [rarities.COMMON]: 100,
+                [rarities.UNCOMMON]: 50,
+                [rarities.RARE]: 20 + currentWave * 1.5,
+                [rarities.MYTHIC]: 8 + currentWave * 1,
+                [rarities.LEGENDARY]: 3 + currentWave * 0.5,
+            };
+
+            const chosenCards = [];
+            let availableCards = [...ALL_CARDS];
+
+            while (chosenCards.length < count && availableCards.length > 0) {
+                const totalWeight = availableCards.reduce((sum, card) => sum + (rarityWeights[card.rarity] || 0), 0);
+                if (totalWeight <= 0) break;
+                let random = Math.random() * totalWeight;
+                
+                for (let i = 0; i < availableCards.length; i++) {
+                    const card = availableCards[i];
+                    const weight = rarityWeights[card.rarity] || 0;
+                    if (random < weight) {
+                        chosenCards.push(card);
+                        availableCards.splice(i, 1);
+                        break;
+                    }
+                    random -= weight;
+                }
+            }
+            return chosenCards;
+        }
+
+        function displayCardSelection(cards, title) {
+            gameState = 'CARD_SELECTION';
+            cardSelectionTitle.innerText = title;
+            cardOptionsContainer.innerHTML = '';
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card rarity-${card.rarity}`;
+                const isUpgrade = player.chosenCards[card.id] > 0;
+                const descriptionKey = isUpgrade && card.descriptionKeyUpgrade ? card.descriptionKeyUpgrade : card.descriptionKey;
+
+                cardEl.innerHTML = `
+                    <div class="card-title">${translations[currentLanguage][card.titleKey] || card.titleKey} ${isUpgrade ? '+' : ''}</div>
+                    <div class="card-description">${translations[currentLanguage][descriptionKey] || descriptionKey}</div>
+                    <div class="card-rarity">${card.rarity}</div>
+                `;
+                cardEl.onclick = () => selectCard(card);
+                cardOptionsContainer.appendChild(cardEl);
+            });
+            cardSelectionScreen.classList.remove('hidden');
+        }
+
+        function selectCard(card) {
+            card.apply(player);
+            player.chosenCards[card.id] = (player.chosenCards[card.id] || 0) + 1;
+            
+            // Check for Ascension for the card itself
+            const cardData = ALL_CARDS.find(c => c.id === card.id);
+            if (cardData && cardData.ascension && !player.ascensions[card.id] && player.chosenCards[card.id] >= cardData.ascension.threshold) {
+                player.ascensions[card.id] = true;
+                cardData.ascension.apply(player);
+                const title = translations[currentLanguage][cardData.ascension.titleKey] || cardData.ascension.titleKey;
+                showWaveAnnouncement(`ASCENSION: ${title}`);
+            }
+
+            // If it's a meta card, check ascension for the sub-card too
+            if (card.metaCardId) {
+                const subCardData = ALL_CARDS.find(c => c.id === card.metaCardId);
+                if (subCardData && subCardData.ascension && !player.ascensions[subCardData.id] && player.chosenCards[subCardData.id] >= subCardData.ascension.threshold) {
+                    player.ascensions[subCardData.id] = true;
+                    subCardData.ascension.apply(player);
+                    const title = translations[currentLanguage][subCardData.ascension.titleKey] || subCardData.ascension.titleKey;
+                    showWaveAnnouncement(`ASCENSION: ${title}`);
+                }
+            }
+
+            // Check for Combinations
+            COMBINATIONS.forEach(combo => {
+                if (!player.combinations[combo.id]) {
+                    const met = combo.required.every(req => (player.chosenCards[req.id] || 0) >= req.count);
+                    if (met) {
+                        player.combinations[combo.id] = true;
+                        combo.apply(player);
+                        const title = translations[currentLanguage][combo.titleKey] || combo.titleKey;
+                        showWaveAnnouncement(`COMBO: ${title}`);
+                    }
+                }
+            });
+
+            updateChosenCardsUI();
+            cardSelectionScreen.classList.add('hidden');
+            gameState = 'PLAYING';
+            startNextWave();
+        }
+        
+        // =================================================================
+        // TRADUÇÃO (I18N)
+        // =================================================================
+        const translations = {
+            en: {
+                startGame: 'Start Game', language: 'Language:', health: 'Health', xp: 'XP', wave: 'Wave', level: 'Level',
+                score: 'Score',
+                grimoire: 'Grimoire', grimoire_title: 'Grimoire of Ascensions',
+                waveClear: 'Wave Cleared! Choose a Relic:',
+                training_mode: 'Training Mode', leaderboard: 'Leaderboard', leaderboard_title: 'Leaderboard',
+                pause_title: 'Paused', resume: 'Resume', quit_to_menu: 'Quit to Menu',
+                game_over: "Game Over",
+                enter_name_prompt: "Enter your name for the leaderboard:",
+                submit_score: "Submit Score",
+                prev_page: "Previous",
+                next_page: "Next",
+                controls_title: "Controls",
+                controls_move: "Move",
+                controls_jump: "Jump",
+                controls_dash: "Dash",
+                controls_aim: "Aim",
+                controls_shoot: "Shoot",
+                controls_auto_attack: "Toggle Auto-Attack",
+                controls_debug: "Debug Menu",
+                controls_training_only: "(Training Mode Only)",
+                card_growth_title: "Growth", card_swift_title: "Swift", card_catalyst_title: "Catalyst", card_resonance_title: "Resonance", card_charge_title: "Charge", card_gush_title: "Gush", card_leech_title: "Leech", card_precision_title: "Precision", card_shrink_title: "Shrink", card_barrier_title: "Barrier", card_thunderbolt_title: "Thunderbolt", card_appraisal_title: "Appraisal", card_immortal_title: "Immortal",
+                card_focus_title: "Focus", card_split_shot_title: "Split Shot", card_chain_lightning_title: "Chain Lightning",
+                card_greater_growth_title: "Greater Growth", card_greater_catalyst_title: "Greater Catalyst", card_arcane_orb_title: "Arcane Orb", card_haste_title: "Haste",
+                card_growth_desc: "Max. HP +10", card_swift_desc: "Movement Speed +20%", card_catalyst_desc: "Projectile Damage +2", card_resonance_desc: "Atk Speed +12%", card_charge_desc: "Projectile Size +20%", card_gush_desc: "Adds +1 Jump", card_leech_desc: "Life Steal of 3% Damage", card_precision_desc: "Critical deals +50% damage", card_shrink_desc: "Makes you 10% smaller", 
+                card_focus_desc: "+5% Critical Hit Chance.", card_split_shot_desc: "Fires an additional projectile.",
+                card_chain_lightning_desc: "Projectiles have a 25% chance to chain to 1 nearby enemy.", card_chain_lightning_desc_upgrade: "Increases chain chance by 10% and adds +1 jump.",
+                card_greater_growth_desc: "Grants +2 Growth levels.", card_greater_catalyst_desc: "Grants +2 Catalyst levels.", card_arcane_orb_desc: "Summons a rotating orb that damages enemies.", card_arcane_orb_desc_upgrade: "Summons an additional orb.", card_haste_desc: "Projectile speed +20%.",
+                card_barrier_desc: "Creates a shield that blocks damage once every 15s", card_barrier_desc_upgrade: "Reduces Barrier cooldown by 20%",
+                card_thunderbolt_desc: "Calls 2 thunderbolts from the skies every few seconds", card_thunderbolt_desc_upgrade: "Calls +1 thunderbolt from the skies",
+                card_appraisal_desc: "+1 item choice from now on", card_immortal_desc: "+1 Revive",
+                // Ascensions
+                asc_growth_title: "Ascension: Regeneration", asc_growth_desc: "Passively regenerates 2 HP/sec.",
+                asc_resonance_title: "Ascension: Arcane Beam", asc_resonance_desc: "Replaces projectiles with a continuous beam of energy.",
+                asc_catalyst_title: "Ascension: Ricochet", asc_catalyst_desc: "Projectiles bounce off walls up to 3 times.",
+                asc_charge_title: "Ascension: Piercing Light", asc_charge_desc: "Projectiles now pierce through all enemies.",
+                asc_barrier_title: "Ascension: Retribution", asc_barrier_desc: "When the barrier breaks, it reflects nearby projectiles.",
+                asc_thunderbolt_title: "Ascension: Consecration", asc_thunderbolt_desc: "Thunderbolts leave a damaging area on the ground.",
+                asc_focus_title: "Ascension: Lethality", asc_focus_desc: "Critical hits deal an additional 100% damage.",
+                asc_split_shot_title: "Ascension: Triple Threat", asc_split_shot_desc: "Fires a third projectile.",
+                asc_chain_lightning_title: "Ascension: Super Conductor", asc_chain_lightning_desc: "Chained projectiles deal full damage and can jump 2 more times.",
+                asc_arcane_orb_title: "Ascension: Orbital Power", asc_arcane_orb_desc: "Orbs are larger, faster, and deal more damage.",
+                asc_haste_title: "Ascension: Warp Speed", asc_haste_desc: "Projectiles accelerate over their lifetime.",
+                // Combinations
+                combo_lightning_shield_title: "Combo: Stormguard", combo_lightning_shield_desc: "While Barrier is active, it periodically zaps nearby enemies.",
+                combo_arcane_explosion_title: "Combo: Explosão Arcana", combo_arcane_explosion_desc: "Projéteis explodem no impacto, causando 50% do dano em área.",
+                combo_chain_reaction_title: "Combo: Reação em Cadeia", combo_chain_reaction_desc: "Projéteis de Tiro Dividido também podem ativar o Raio em Cadeia.",
+                combo_orbital_barrage_title: "Combo: Barragem Orbital", combo_orbital_barrage_desc: "Sua velocidade de ataque também aumenta a velocidade de rotação dos orbes.",
+                combo_title: "Combinações",
+            },
+            pt: {
+                startGame: 'Iniciar Jogo', language: 'Idioma:', health: 'Vida', xp: 'XP', wave: 'Wave', level: 'Nível',
+                score: 'Pontos',
+                grimoire: 'Grimório', grimoire_title: 'Grimório de Ascensões',
+                waveClear: 'Wave Completa! Escolha uma Relíquia:',
+                training_mode: 'Modo Treino', leaderboard: 'Placar', leaderboard_title: 'Placar de Líderes',
+                pause_title: 'Pausado', resume: 'Retornar', quit_to_menu: 'Sair para o Menu',
+                game_over: "Fim de Jogo",
+                enter_name_prompt: "Digite seu nome para o placar:",
+                submit_score: "Enviar Pontuação",
+                prev_page: "Anterior",
+                next_page: "Próxima",
+                controls_title: "Controles",
+                controls_move: "Mover",
+                controls_jump: "Pular",
+                controls_dash: "Correr",
+                controls_aim: "Mirar",
+                controls_shoot: "Atirar",
+                controls_auto_attack: "Alternar Ataque Automático",
+                controls_debug: "Menu de Depuração",
+                controls_training_only: "(Apenas Modo Treino)",
+                card_growth_title: "Crescimento", card_swift_title: "Rapidez", card_catalyst_title: "Catalisador", card_resonance_title: "Ressonância", card_charge_title: "Carga", card_gush_title: "Impulso", card_leech_title: "Sanguessuga", card_precision_title: "Precisão", card_shrink_title: "Encolher", card_barrier_title: "Barreira", card_thunderbolt_title: "Relâmpago", card_appraisal_title: "Avaliação", card_immortal_title: "Imortal",
+                card_focus_title: "Foco", card_split_shot_title: "Tiro Dividido", card_chain_lightning_title: "Raio em Cadeia",
+                card_greater_growth_title: "Crescimento Maior", card_greater_catalyst_title: "Catalisador Maior", card_arcane_orb_title: "Orbe Arcano", card_haste_title: "Aceleração",
+                card_growth_desc: "Vida Máx. +10", card_swift_desc: "Velocidade de Movimento +20%", card_catalyst_desc: "Dano do Projétil +2", card_resonance_desc: "Vel. de Ataque +12%", card_charge_desc: "Tamanho do Projétil +20%", card_gush_desc: "Adiciona +1 Pulo", card_leech_desc: "Roubo de Vida de 3% do Dano", card_precision_desc: "Dano Crítico +50%", card_shrink_desc: "Deixa você 10% menor", 
+                card_focus_desc: "+5% de Chance de Acerto Crítico.", card_split_shot_desc: "Dispara um projétil adicional.",
+                card_chain_lightning_desc: "Projéteis têm 25% de chance de saltar para 1 inimigo próximo.", card_chain_lightning_desc_upgrade: "Aumenta a chance de saltar em 10% e adiciona +1 salto.",
+                card_greater_growth_desc: "Concede +2 níveis de Crescimento.", card_greater_catalyst_desc: "Concede +2 níveis de Catalisador.", card_arcane_orb_desc: "Invoca um orbe giratório que causa dano.", card_arcane_orb_desc_upgrade: "Invoca um orbe adicional.", card_haste_desc: "Velocidade do projétil +20%.",
+                card_barrier_desc: "Cria um escudo que bloqueia dano a cada 15s", card_barrier_desc_upgrade: "Reduz o tempo de recarga da Barreira em 20%",
+                card_thunderbolt_desc: "Chama 2 raios dos céus a cada poucos segundos", card_thunderbolt_desc_upgrade: "Chama +1 raio dos céus",
+                card_appraisal_desc: "+1 opção de item a partir de agora", card_immortal_desc: "+1 Revive",
+                // Ascensions
+                asc_growth_title: "Ascensão: Regeneração", asc_growth_desc: "Regenera passivamente 2 de Vida/seg.",
+                asc_resonance_title: "Ascensão: Raio Arcano", asc_resonance_desc: "Substitui projéteis por um raio contínuo de energia.",
+                asc_catalyst_title: "Ascensão: Ricochete", asc_catalyst_desc: "Projéteis ricocheteiam nas paredes até 3 vezes.",
+                asc_charge_title: "Ascensão: Luz Perfurante", asc_charge_desc: "Projéteis agora perfuram todos os inimigos.",
+                asc_barrier_title: "Ascensão: Retribuição", asc_barrier_desc: "Quando a barreira quebra, ela reflete projéteis próximos.",
+                asc_thunderbolt_title: "Ascensão: Consagração", asc_thunderbolt_desc: "Relâmpagos deixam uma área de dano no chão.",
+                asc_focus_title: "Ascensão: Letalidade", asc_focus_desc: "Acertos críticos causam 100% de dano adicional.",
+                asc_split_shot_title: "Ascensão: Ameaça Tripla", asc_split_shot_desc: "Dispara um terceiro projétil.",
+                asc_chain_lightning_title: "Ascensão: Supercondutor", asc_chain_lightning_desc: "Raios em cadeia causam dano total e podem saltar mais 2 vezes.",
+                asc_arcane_orb_title: "Ascensão: Poder Orbital", asc_arcane_orb_desc: "Orbes são maiores, mais rápidos e causam mais dano.",
+                asc_haste_title: "Ascensão: Velocidade da Luz", asc_haste_desc: "Projéteis aceleram durante sua vida útil.",
+                // Combinations
+                combo_lightning_shield_title: "Combo: Guarda-Tempestade", combo_lightning_shield_desc: "Enquanto a Barreira está ativa, ela periodicamente atinge inimigos próximos com raios.",
+                combo_arcane_explosion_title: "Combo: Explosão Arcana", combo_arcane_explosion_desc: "Projéteis explodem no impacto, causando 50% do dano em área.",
+                combo_chain_reaction_title: "Combo: Reação em Cadeia", combo_chain_reaction_desc: "Projéteis de Tiro Dividido também podem ativar o Raio em Cadeia.",
+                combo_orbital_barrage_title: "Combo: Barragem Orbital", combo_orbital_barrage_desc: "Sua velocidade de ataque também aumenta a velocidade de rotação dos orbes.",
+                combo_title: "Combinações",
+            }
+        };
+        let currentLanguage = 'pt';
+        
+        // =================================================================
+        // JOGADOR
+        // =================================================================
+        const player = {
+            x: 0, y: 0, width: 40, height: 60,
+            color: '#3498db', staffColor: '#8B4513',
+            velocityX: 0, velocityY: 0, speed: 500, jumpForce: 900,
+            isJumping: false, onGround: false, jumpCount: 0, maxJumps: 1,
+            canDash: true, isDashing: false, dashSpeed: 1200, dashDuration: 150, dashCooldown: 1000,
+            isInvulnerable: false,
+            // Stats
+            maxHealth: 100, health: 100,
+            level: 1, xp: 0, xpToNextLevel: 100,
+            score: 0,
+            attackSpeed: 500, projectileDamage: 10, projectileSize: 8, lifeSteal: 0, critChance: 0.05, critDamage: 1.5,
+            cardChoices: 3, revives: 0,
+            // Card Effects
+            hasBarrier: false, barrierReady: true, barrierCooldown: 15000, lastBarrierTime: 0,
+            hasThunderbolt: false, lastThunderboltTime: 0, thunderboltCooldown: 5000, thunderboltCount: 2,
+            chosenCards: {},
+            ascensions: {},
+            combinations: {},
+            healthRegen: 0,
+            projectileMaxBounces: 0,
+            projectilesPierce: false,
+            hasResonanceAscension: false,
+            barrierReflects: false,
+            thunderboltLeavesAoe: false,
+            hasLightningShield: false,
+            lastLightningShieldZap: 0,
+            extraProjectiles: 0,
+            chainLightning: null,
+            projectilesExplode: false,
+            arcaneOrbs: { count: 0, angle: 0, powerUp: false },
+            projectileSpeedMultiplier: 1,
+            projectilesAccelerate: false,
+            splitProjectilesChain: false,
+            attackSpeedAffectsOrbs: false,
+            pixelScale: 2.0, // <-- Reduzido de 2.5 para 2.0
+        };
+
+        // =================================================================
+        // RESPONSIVIDADE & CENÁRIO
+        // =================================================================
+        let groundY;
+
+        let backgroundStars = [];
+        function generateStars() {
+            backgroundStars = [];
+            for (let i = 0; i < 120; i++) {
+                backgroundStars.push({
+                    x: Math.random(),
+                    y: Math.random() * 0.5,
+                    r: Math.random() * 1.2 + 0.3,
+                    baseAlpha: Math.random() * 0.7 + 0.3,
+                    twinkleSpeed: Math.random() * 1.5 + 0.5,
+                    twinklePhase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        // --- Adicione esta variável global para armazenar as árvores estáticas ---
+        let staticTrees = [];
+        function generateStaticTrees() {
+            staticTrees = [];
+            const yBase = canvas.height * 0.95;
+            const color = "#1e3921";
+            const scale = 1.3;
+            const density = 22;
+            for (let i = 0; i < canvas.width; i += density) {
+                const x = i;
+                // Use uma semente baseada em x para altura consistente ao redimensionar
+                const rand = Math.abs(Math.sin(x * 9999)) * 1; // valor determinístico
+                const h = 40 * scale + rand * 10 * scale;
+                const y = yBase - h;
+                staticTrees.push({ x, yBase, y, scale, color });
+            }
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            groundY = canvas.height - 50;
+            generateStaticTrees(); // Gere as árvores estáticas ao redimensionar
+        }
+
+        function sanitizeHTML(str) {
+            return str.replace(/<[^>]*>?/gm, '');
+        }
+
+        // =================================================================
+        // FUNÇÕES COMPLETAS
+        // =================================================================
+        function updateUIText() {
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if (translations[currentLanguage] && translations[currentLanguage][key]) {
+                   el.innerText = translations[currentLanguage][key];
+                }
+            });
+            updateChosenCardsUI();
+            displayMainMenuLeaderboard();
+            document.getElementById('player-level').innerText = `${translations[currentLanguage].level || 'Level'}: ${player.level}`;
+            langPtBtn.classList.toggle('bg-blue-600', currentLanguage === 'pt');
+            langPtBtn.classList.toggle('bg-gray-700', currentLanguage !== 'pt');
+            langEnBtn.classList.toggle('bg-blue-600', currentLanguage === 'en');
+            langEnBtn.classList.toggle('bg-gray-700', currentLanguage !== 'en');
+        }
+
+        const MAX_LEADERBOARD_ENTRIES = 10;
+
+        async function saveScoreToLeaderboard(name, score) {
+            if (typeof score !== 'number' || score < 0 || !name) return;
+            try {
+                await addDoc(leaderboardCollection, {
+                    name: name,
+                    score: score,
+                    date: new Date().toISOString()
+                });
+                console.log("Score saved to Firebase");
+            } catch (error) {
+                console.error("Error saving score to Firebase: ", error);
+            }
+        }
+        
+        function drawBackground() {
+            // Céu noturno com gradiente
+            const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            sky.addColorStop(0, '#0a1833');
+            sky.addColorStop(0.5, '#183a5c');
+            sky.addColorStop(1, '#27496d');
+            ctx.fillStyle = sky;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Aurora Boreal (camadas de curvas translúcidas)
+            for (let i = 0; i < 3; i++) {
+                ctx.save();
+                ctx.globalAlpha = 0.18 + 0.07 * i;
+                ctx.beginPath();
+                const baseY = 120 + i * 30;
+                ctx.moveTo(0, baseY);
+                for (let x = 0; x <= canvas.width; x += 10) {
+                    const y = baseY + Math.sin((x / canvas.width) * Math.PI * 2 + performance.now() / (2200 + i * 800)) * (30 + i * 10);
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(canvas.width, 0);
+                ctx.lineTo(0, 0);
+                ctx.closePath();
+                const auroraGradient = ctx.createLinearGradient(0, baseY, canvas.width, baseY + 80);
+                auroraGradient.addColorStop(0, i === 0 ? "#aaffee" : i === 1 ? "#7fffd4" : "#b388ff");
+                auroraGradient.addColorStop(0.5, i === 0 ? "#7ecfff" : i === 1 ? "#baffc9" : "#e0c3fc");
+                auroraGradient.addColorStop(1, i === 0 ? "#00ffc6" : i === 1 ? "#00e6ff" : "#8ecae6");
+                ctx.fillStyle = auroraGradient;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Estrelas (usando backgroundStars)
+            ctx.save();
+            const now = performance.now() / 1000;
+            for (const s of backgroundStars) {
+                const alpha = s.baseAlpha * (0.7 + 0.3 * Math.sin(now * s.twinkleSpeed + s.twinklePhase));
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, 2 * Math.PI);
+                ctx.fillStyle = "#fff";
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
+
+            // Montanhas dos Alpes (camadas)
+            function drawMountain(yBase, color, peakCount, height, roughness, phase) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(0, yBase);
+                for (let x = 0; x <= canvas.width; x += 8) {
+                    const t = x / canvas.width;
+                    const peaks = Math.sin(t * Math.PI * peakCount + phase) * height;
+                    const noise = Math.sin(t * 12 + phase * 2) * roughness;
+                    const y = yBase - peaks - noise;
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(canvas.width, canvas.height);
+                ctx.lineTo(0, canvas.height);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.shadowColor = "#000";
+                ctx.shadowBlur = 20;
+                ctx.fill();
+                ctx.restore();
+            }
+            drawMountain(canvas.height * 0.55, "#b8d8f7", 4, 90, 12, 0.2);
+            drawMountain(canvas.height * 0.65, "#e0e6ed", 5, 70, 18, 0.7);
+            drawMountain(canvas.height * 0.75, "#a0a6b0", 6, 50, 22, 1.3);
+
+            // Árvores (apenas a camada mais próxima do chão, estática)
+            function drawTrees() {
+                ctx.save();
+                staticTrees.forEach(tree => {
+                    ctx.fillStyle = tree.color;
+                    // Tronco
+                    ctx.fillRect(tree.x - 2 * tree.scale, tree.yBase - 10 * tree.scale, 4 * tree.scale, 10 * tree.scale);
+                    // Copa (triângulo)
+                    ctx.beginPath();
+                    ctx.moveTo(tree.x, tree.y);
+                    ctx.lineTo(tree.x - 10 * tree.scale, tree.yBase - 10 * tree.scale);
+                    ctx.lineTo(tree.x + 10 * tree.scale, tree.yBase - 10 * tree.scale);
+                    ctx.closePath();
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
+            drawTrees();
+        }
+        function drawGroundAndWalls() {
+            // Grama (topo do chão)
+            const grassHeight = 18;
+            ctx.save();
+            // Grama com irregularidade
+            ctx.beginPath();
+            ctx.moveTo(0, groundY + grassHeight / 2);
+            for (let x = 0; x <= canvas.width; x += 16) {
+                const y = groundY + Math.sin(x * 0.04) * 4 + Math.cos(x * 0.09) * 2;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(canvas.width, groundY + grassHeight);
+            ctx.lineTo(0, groundY + grassHeight);
+            ctx.closePath();
+            ctx.fillStyle = "#3bb143";
+            ctx.shadowColor = "#1e3921";
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Corpo do chão (terra)
+            ctx.fillStyle = "#7c4a1e";
+            ctx.fillRect(0, groundY + grassHeight, canvas.width, 50 - grassHeight);
+
+            // Detalhes de terra (pedras, raízes)
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.fillStyle = "#a67c52";
+                ctx.beginPath();
+                ctx.ellipse(i + 10, groundY + grassHeight + 20 + Math.sin(i), 6, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#5b3a1b";
+                ctx.beginPath();
+                ctx.ellipse(i + 25, groundY + grassHeight + 30 + Math.cos(i), 3, 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Laterais (paredes)
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, 10, groundY + grassHeight);
+            ctx.fillRect(canvas.width - 10, 0, 10, groundY + grassHeight);
+            ctx.restore();
+        };
+
+        // Substitua drawPlatforms para plataformas de madeira (andaimes)
+        function drawPlatforms() {
+            platforms.forEach(p => {
+                ctx.save();
+                // Pilares (troncos) - agora vão até o chão
+                ctx.fillStyle = "#8b5c2a";
+                const pillarWidth = 12;
+                // Esquerdo
+                ctx.fillRect(
+                    p.x,
+                    p.y,
+                    pillarWidth,
+                    groundY + 18 - p.y // altura até o chão
+                );
+                // Direito
+                ctx.fillRect(
+                    p.x + p.width - pillarWidth,
+                    p.y,
+                    pillarWidth,
+                    groundY + 18 - p.y
+                );
+
+                // Tábuas superiores (madeira)
+                const plankCount = Math.max(2, Math.floor(p.width / 40));
+                for (let i = 0; i < plankCount; i++) {
+                    const plankX = p.x + (i * (p.width / plankCount));
+                    const plankW = p.width / plankCount - 2;
+                    ctx.fillStyle = "#c49a6c";
+                    ctx.fillRect(plankX, p.y, plankW, 10);
+
+                    // Detalhes de madeira (linhas)
+                    ctx.strokeStyle = "#a67c52";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(plankX + 4, p.y + 3);
+                    ctx.lineTo(plankX + plankW - 4, p.y + 7);
+                    ctx.stroke();
+                }
+
+                // Cordas laterais (opcional)
+                ctx.strokeStyle = "#e2c290";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(p.x + pillarWidth / 2, p.y + 10);
+                ctx.lineTo(p.x + pillarWidth / 2, groundY + 10);
+                ctx.moveTo(p.x + p.width - pillarWidth / 2, p.y + 10);
+                ctx.lineTo(p.x + p.width - pillarWidth / 2, groundY + 10);
+                ctx.stroke();
+
+                ctx.restore();
+            });
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            // Pixel art scale
+            const scale = player.pixelScale; // <--- Use player.pixelScale
+            const px = Math.floor(player.x + player.width / 2);
+            const py = Math.floor(player.y + player.height / 2);
+
+            // --- Body (túnica azul) ---
+            ctx.fillStyle = "#2563eb";
+            ctx.fillRect(px - 12 * scale, py - 18 * scale, 24 * scale, 28 * scale);
+
+            // Tunic shadow
+            ctx.fillStyle = "#1e40af";
+            ctx.fillRect(px - 12 * scale, py + 2 * scale, 24 * scale, 8 * scale);
+
+            // --- Face (rosto) ---
+            ctx.fillStyle = "#f3e9d2";
+            ctx.fillRect(px - 7 * scale, py - 22 * scale, 14 * scale, 8 * scale);
+
+            // --- Beard (barba branca) ---
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(px - 8 * scale, py - 14 * scale, 16 * scale, 8 * scale);
+            ctx.fillRect(px - 4 * scale, py - 6 * scale, 8 * scale, 8 * scale);
+
+            // --- Hat (chapéu marrom) ---
+            ctx.fillStyle = "#6d4c1b";
+            ctx.fillRect(px - 12 * scale, py - 28 * scale, 24 * scale, 6 * scale);
+            ctx.beginPath();
+            ctx.moveTo(px, py - 44 * scale);
+            ctx.lineTo(px - 10 * scale, py - 28 * scale);
+            ctx.lineTo(px + 10 * scale, py - 28 * scale);
+            ctx.closePath();
+            ctx.fillStyle = "#8b5c2a";
+            ctx.fill();
+
+            // --- Eyes (olhos) ---
+            ctx.fillStyle = "#222";
+            ctx.fillRect(px - 3 * scale, py - 19 * scale, 2 * scale, 2 * scale);
+            ctx.fillRect(px + 1 * scale, py - 19 * scale, 2 * scale, 2 * scale);
+
+            // --- Left Arm (braço esquerdo) ---
+            ctx.fillStyle = "#2563eb";
+            ctx.fillRect(px - 14 * scale, py - 8 * scale, 4 * scale, 14 * scale);
+            // --- Left Hand (mão esquerda) ---
+            ctx.fillStyle = "#f3e9d2";
+            ctx.fillRect(px - 14 * scale, py + 6 * scale, 4 * scale, 4 * scale);
+
+            // --- Right Arm (braço direito) ---
+            ctx.fillStyle = "#2563eb";
+            ctx.fillRect(px + 10 * scale, py - 8 * scale, 4 * scale, 14 * scale);
+
+            // --- Staff (cajado) --- (desenhar a partir da mão direita, na frente)
+            // A mão direita está em (px + 10 * scale, py + 6 * scale)
+            ctx.save();
+            ctx.translate(px + 12 * scale, py + 8 * scale); // ponto de origem: centro da mão direita
+            const angle = Math.atan2(mouse.y - (py + 8 * scale), mouse.x - (px + 12 * scale));
+            ctx.rotate(angle);
+
+            // Staff rod (marrom escuro)
+            for (let i = 0; i < 8; i++) {
+                ctx.fillStyle = "#4b2e13";
+                ctx.fillRect(0 + i * 6, -3 * scale, 6, 6 * scale);
+            }
+            // Staff tip (pedra roxa)
+            ctx.fillStyle = "#a259c4";
+            ctx.fillRect(8 * 6, -5 * scale, 10, 10);
+            ctx.restore();
+
+            // --- Right Hand (mão direita, por cima do cajado) ---
+            ctx.fillStyle = "#f3e9d2";
+            ctx.fillRect(px + 10 * scale, py + 6 * scale, 4 * scale, 4 * scale);
+
+            // --- Feet (pés) ---
+            ctx.fillStyle = "#222";
+            ctx.fillRect(px - 8 * scale, py + 10 * scale, 6 * scale, 4 * scale);
+            ctx.fillRect(px + 2 * scale, py + 10 * scale, 6 * scale, 4 * scale);
+
+            ctx.restore();
+
+            // Barrier (drawn last, not translated/rotated)
+            if (player.hasBarrier && player.barrierReady) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(px, py, 28 * scale, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Lightning Shield (from combination)
+            if (player.hasLightningShield && player.barrierReady) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(px, py, 32 * scale + Math.sin(performance.now() / 100) * 3, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
+        function updatePlayer(timestamp, deltaTime) {
+            const GRAVITY = 2500; // pixels/sec^2
+            const FRICTION_DECAY_PER_SEC = 0.0001; // Fator de decaimento da fricção
+
+            player.velocityY += GRAVITY * deltaTime;
+            
+            // Aplica fricção se não estiver se movendo com as teclas e não estiver dando dash
+            const moving = keys['KeyA'] || keys['ArrowLeft'] || keys['KeyD'] || keys['ArrowRight'];
+            if (!moving && !player.isDashing) {
+                player.velocityX *= Math.pow(FRICTION_DECAY_PER_SEC, deltaTime);
+            }
+
+            if (keys['KeyA'] || keys['ArrowLeft']) player.velocityX = -player.speed;
+            if (keys['KeyD'] || keys['ArrowRight']) player.velocityX = player.speed;
+            
+            player.x += player.velocityX * deltaTime;
+            player.y += player.velocityY * deltaTime;
+
+            // Platform and ground collision
+            let onSolidSurface = false;
+            const playerBottom = player.y + player.height;
+
+            // Check ground first
+            if (playerBottom >= groundY) {
+                player.y = groundY - player.height;
+                player.velocityY = 0;
+                onSolidSurface = true;
+            } else {
+                // Check platforms only if not on the ground
+                platforms.forEach(p => {
+                    const playerLastBottom = (player.y - player.velocityY * deltaTime) + player.height;
+                    if (
+                        player.velocityY >= 0 && // Is falling
+                        playerBottom >= p.y && playerLastBottom <= p.y + 1 && // Crossed the platform top edge (with a small tolerance)
+                        player.x + player.width > p.x && player.x < p.x + p.width // Horizontally aligned
+                    ) {
+                        player.y = p.y - player.height;
+                        player.velocityY = 0;
+                        onSolidSurface = true;
+                    }
+                });
+            }
+
+            if (onSolidSurface) {
+                player.isJumping = false;
+                player.onGround = true;
+                player.jumpCount = 0;
+            } else {
+                player.onGround = false;
+            }
+
+            if (player.x < 10) player.x = 10;
+            if (player.x + player.width > canvas.width - 10) player.x = canvas.width - 10 - player.width;
+
+            if (player.hasBarrier && !player.barrierReady && timestamp - player.lastBarrierTime > player.barrierCooldown) {
+                player.barrierReady = true;
+            }
+
+            if (player.hasThunderbolt && timestamp - player.lastThunderboltTime > player.thunderboltCooldown) {
+                spawnThunderbolts();
+                player.lastThunderboltTime = timestamp;
+            }
+
+            // Health Regen (from Growth ascension)
+            if (player.healthRegen > 0) {
+                player.health = Math.min(player.maxHealth, player.health + player.healthRegen * deltaTime);
+                updateGameUI();
+            }
+
+            // Lightning Shield Zaps (from combination)
+            if (player.hasLightningShield && player.barrierReady && timestamp - player.lastLightningShieldZap > 1000) {
+                const zapRadius = 150;
+                const zapDamage = 15;
+                let zapped = false;
+                enemies.forEach(e => {
+                    if (zapped) return;
+                    const dist = Math.hypot((e.x + e.width/2) - (player.x + player.width/2), (e.y + e.height/2) - (player.y + player.height/2));
+                    if (dist < zapRadius) {
+                        e.health -= zapDamage;
+                        spawnDamageNumber(zapDamage, e.x + e.width / 2, e.y, '#f1c40f', 24);
+                        particles.push({
+                            isLightningZap: true,
+                            life: 0.2,
+                            startX: player.x + player.width / 2,
+                            startY: player.y + player.height / 2,
+                            endX: e.x + e.width / 2,
+                            endY: e.y + e.height / 2,
+                            color: '#f1c40f'
+                        });
+                        zapped = true;
+                    }
+                });
+                if (zapped) {
+                    player.lastLightningShieldZap = timestamp;
+                }
+            }
+        };
+        function handleJump() { 
+            if ((keys['KeyW'] || keys['Space']) && player.jumpCount < player.maxJumps) { 
+                player.velocityY = -player.jumpForce; 
+                player.isJumping = true; 
+                player.jumpCount++; 
+                keys['KeyW'] = false; 
+                keys['Space'] = false; 
+            }
+        };
+        function handleDash() {
+            if (keys['ShiftLeft'] && player.canDash && !player.isDashing) {
+                player.isDashing = true;
+                player.canDash = false;
+                player.isInvulnerable = true;
+                const direction = (keys['KeyD'] || keys['ArrowRight']) ? 1 : (keys['KeyA'] || keys['ArrowLeft']) ? -1 : 1;
+                player.velocityX = direction * player.dashSpeed;
+                player.velocityY = -100;
+                setTimeout(() => {
+                    player.isDashing = false;
+                    setTimeout(() => { player.isInvulnerable = false; }, 100);
+                }, player.dashDuration);
+                setTimeout(() => {
+                    player.canDash = true;
+                }, player.dashCooldown);
+            }
+        };
+        function spawnProjectile(startX, startY, targetX, targetY, options = {}) { 
+            const angle = Math.atan2(targetY - startY, targetX - startX); 
+            projectiles.push({ 
+                x: startX, y: startY, 
+                vx: Math.cos(angle) * 900 * player.projectileSpeedMultiplier, 
+                vy: Math.sin(angle) * 900 * player.projectileSpeedMultiplier, 
+                size: player.projectileSize, 
+                color: '#9b59b6', 
+                bloomColor: 'rgba(155,  89, 182, 0.7)', 
+                damage: player.projectileDamage,
+                bouncesLeft: player.projectileMaxBounces,
+                accelerates: player.projectilesAccelerate,
+                isSplit: options.isSplit || false,
+            }); 
+        };
+        function updateProjectiles(deltaTime) { 
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+               
+                p.x += p.vx * deltaTime; 
+                p.y += p.vy * deltaTime; 
+                
+                if (p.accelerates) {
+                    p.vx *= (1 + 1.5 * deltaTime);
+                    p.vy *= (1 + 1.5 * deltaTime);
+                }
+
+                // Trail particles
+                if (Math.random() < 0.9) {
+                    particles.push({
+                        x: p.x, y: p.y,
+                        vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40,
+                        size: Math.random() * (p.size * 0.8) + 1,
+                        color: p.bloomColor,
+                        life: 0.6
+                    });
+                }
+
+                // Wall bouncing logic
+                let spliced = false;
+                if (p.x - p.size < 10 || p.x + p.size > canvas.width - 10) {
+                    if (p.bouncesLeft > 0) {
+                        p.vx *= -1;
+                        p.x += p.vx * deltaTime; // Nudge it out of the wall
+                        p.bouncesLeft--;
+                    } else {
+                        projectiles.splice(i, 1);
+                        spliced = true;
+                    }
+                }
+                if (!spliced && (p.y - p.size < 0 || p.y + p.size > groundY)) {
+                     if (p.bouncesLeft > 0) {
+                        p.vy *= -1;
+                        p.y += p.vy * deltaTime; // Nudge it out of the wall
+                        p.bouncesLeft--;
+                    } else {
+                        projectiles.splice(i, 1);
+                        spliced = true;
+                    }
+                }
+
+                if (!spliced && (p.x < -100 || p.x > canvas.width + 100 || p.y < -100 || p.y > canvas.height + 100)) {
+                     projectiles.splice(i, 1);
+                }
+            }
+        };
+        function drawProjectiles() { 
+            projectiles.forEach(p => { 
+                ctx.save();
+                // Create a radial gradient for a softer core
+                const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)'); // Bright, almost white center
+                gradient.addColorStop(0.4, p.color); // Transition to main color
+                gradient.addColorStop(1, p.color);   // Main color at the edge
+
+                ctx.shadowBlur = 20; 
+                ctx.shadowColor = p.bloomColor; 
+                
+                ctx.fillStyle = gradient; 
+                ctx.beginPath(); 
+                ctx.arc(p.x, p.y, p.size, 0, 2 * Math.PI); 
+                ctx.fill(); 
+                
+                ctx.restore();
+            }); 
+        }
+        function drawLightningBeam() {
+            const playerCenterX = player.x + player.width / 2;
+            const playerCenterY = player.y + player.height / 2;
+            const angle = Math.atan2(mouse.y - playerCenterY, mouse.x - playerCenterX);
+            const staffTotalLength = 70;
+            const beamStartX = playerCenterX + Math.cos(angle) * staffTotalLength;
+            const beamStartY = playerCenterY + Math.sin(angle) * staffTotalLength;
+            
+            const beamLength = canvas.width + canvas.height;
+            const beamEndX = beamStartX + Math.cos(angle) * beamLength;
+            const beamEndY = beamStartY + Math.sin(angle) * beamLength;
+
+            ctx.save();
+            ctx.strokeStyle = 'cyan';
+            ctx.lineWidth = 5 + Math.sin(performance.now() / 50) * 3;
+            ctx.shadowColor = 'cyan';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.moveTo(beamStartX, beamStartY);
+            ctx.lineTo(beamEndX, beamEndY);
+            ctx.stroke();
+            ctx.restore();
+        }
+        function spawnThunderbolts() {
+            for (let i = 0; i < player.thunderboltCount; i++) {
+                const strikeX = Math.random() * canvas.width;
+                const strikeY = groundY; // Lightning strikes the ground
+                
+                particles.push({ x: strikeX, isThunderboltVisual: true, life: 0.2 });
+                
+                const strikeRadius = 50;
+                const thunderDamage = 25;
+                for (let eIndex = enemies.length - 1; eIndex >= 0; eIndex--) {
+                    const e = enemies[eIndex];
+                    const dist = Math.hypot(strikeX - (e.x + e.width / 2), strikeY - (e.y + e.height / 2));
+                    if (dist < strikeRadius) {
+                        e.health -= thunderDamage; // Thunderbolt damage
+                        spawnDamageNumber(thunderDamage, e.x + e.width / 2, e.y, '#8e44ad', 28);
+                        if (e.health <= 0) {
+                            createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color);
+                            player.xp += e.xp;
+                            if (!isTrainingMode) {
+                                player.score += e.points || 0;
+                            }
+                            enemies.splice(eIndex, 1);
+                            updateGameUI();
+                        }
+                    }
+                }
+                createExplosion(strikeX, strikeY, '#f1c40f');
+            }
+        }
+        function createEnemy() { 
+            const waveBonus = Math.pow(1.1, currentWave - 1); 
+            
+            let typeKey = 'GRUNT';
+            const rand = Math.random();
+            if (currentWave > 5 && rand < 0.65) typeKey = 'SNIPER';
+            else if (currentWave > 3 && rand < 0.5) typeKey = 'RUSHER';
+            else if (currentWave > 2 && rand < 0.25) typeKey = 'TANK';
+            
+            const type = enemyTypes[typeKey];
+            const size = type.size + Math.random() * 5;
+
+            enemies.push({ 
+                type: typeKey,
+                x: Math.random() * (canvas.width - size), 
+                y: -size, width: size, height: size * 0.8, 
+                vx: (Math.random() - 0.5) * type.speed, vy: 50, 
+                maxHealth: Math.floor(20 * waveBonus * type.healthMultiplier), 
+                health: Math.floor(20 * waveBonus * type.healthMultiplier), 
+                color: type.color, 
+                attackCooldown: type.attackCooldown ? type.attackCooldown + Math.random() * 1000 : null, 
+                lastAttackTime: 0,
+                ...type
+            }); 
+        };
+        function updateEnemies(timestamp, deltaTime) {
+            enemies.forEach(e => {
+                if (e.attackType === 'melee') {
+                    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+                    e.vx = Math.cos(angle) * e.speed;
+                    e.vy = Math.sin(angle) * e.speed;
+                    e.x += e.vx * deltaTime;
+                    e.y += e.vy * deltaTime;
+                } else { // Ranged behavior
+                    const hoverTargetY = canvas.height * (0.2 + Math.random() * 0.2);
+                    if (e.y < hoverTargetY) e.y += e.vy * deltaTime;
+                    
+                    e.x += e.vx * deltaTime;
+                    if (e.x < 10 || e.x + e.width > canvas.width - 10) e.vx *= -1;
+
+                    if (timestamp - e.lastAttackTime > e.attackCooldown) {
+                        spawnEnemyProjectile(e.x + e.width / 2, e.y + e.height / 2, player.x + player.width / 2, player.y + player.height / 2, e);
+                        e.lastAttackTime = timestamp;
+                    }
+                }
+                // Clamp enemy position to stay within bounds
+                e.x = Math.max(10, Math.min(e.x, canvas.width - e.width - 10));
+                if (e.y + e.height > groundY) {
+                    e.y = groundY - e.height;
+                }
+                if (e.y < 0) {
+                    e.y = 0;
+                }
+            });
+        };
+        function drawEnemies() { 
+            enemies.forEach(e => { 
+                ctx.save();
+                const cx = e.x + e.width / 2;
+                const cy = e.y + e.height / 2;
+                if (e.type === 'GRUNT') {
+                    // Olho demoníaco flutuante
+                    // Esclera
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, e.width/2, e.height/2, 0, 0, 2*Math.PI);
+                    ctx.fillStyle = "#fff";
+                    ctx.shadowColor = "#c0392b";
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // Íris
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/4, 0, 2*Math.PI);
+                    ctx.fillStyle = "#c0392b";
+                    ctx.fill();
+                    // Pupila
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/10, 0, 2*Math.PI);
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    // Veias
+                    for (let i = 0; i < 5; i++) {
+                        const angle = Math.PI * 2 * i / 5 + performance.now()/500;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy);
+                        ctx.lineTo(cx + Math.cos(angle) * e.width/2, cy + Math.sin(angle) * e.height/2);
+                        ctx.strokeStyle = "#e57373";
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                    }
+                } else if (e.type === 'TANK') {
+                    // Olho demoníaco maior, com veias e chifres
+                    // Esclera
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, e.width/2, e.height/2, 0, 0, 2*Math.PI);
+                    ctx.fillStyle = "#f8e1e1";
+                    ctx.shadowColor = "#8e44ad";
+                    ctx.shadowBlur = 16;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // Íris
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/4, 0, 2*Math.PI);
+                    ctx.fillStyle = "#8e44ad";
+                    ctx.fill();
+                    // Pupila
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/11, 0, 2*Math.PI);
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    // Veias extras
+                    for (let i = 0; i < 8; i++) {
+                        const angle = Math.PI * 2 * i / 8 + performance.now()/700;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy);
+                        ctx.lineTo(cx + Math.cos(angle) * e.width/2, cy + Math.sin(angle) * e.height/2);
+                        ctx.strokeStyle = "#b71c1c";
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    // Chifres
+                    ctx.save();
+                    ctx.translate(cx, cy - e.height/2);
+                    ctx.rotate(-0.4);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-10, -18);
+                    ctx.lineTo(-5, 0);
+                    ctx.closePath();
+                    ctx.fillStyle = "#333";
+                    ctx.fill();
+                    ctx.restore();
+                    ctx.save();
+                    ctx.translate(cx, cy - e.height/2);
+                    ctx.rotate(0.4);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(10, -18);
+                    ctx.lineTo(5, 0);
+                    ctx.closePath();
+                    ctx.fillStyle = "#333";
+                    ctx.fill();
+                    ctx.restore();
+                } else if (e.type === 'RUSHER') {
+                    // Morcego
+                    // Corpo
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, e.width/3, e.height/2.5, 0, 0, 2*Math.PI);
+                    ctx.fillStyle = "#222";
+                    ctx.shadowColor = "#27ae60";
+                    ctx.shadowBlur = 8;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // Cabeça
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy - e.height/4, e.width/5, e.height/5, 0, 0, 2*Math.PI);
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    // Olhos vermelhos
+                    ctx.beginPath();
+                    ctx.arc(cx - e.width/12, cy - e.height/4, e.width/18, 0, 2*Math.PI);
+                    ctx.arc(cx + e.width/12, cy - e.height/4, e.width/18, 0, 2*Math.PI);
+                    ctx.fillStyle = "#e74c3c";
+                    ctx.fill();
+                    // Orelhas
+                    ctx.beginPath();
+                    ctx.moveTo(cx - e.width/10, cy - e.height/3);
+                    ctx.lineTo(cx - e.width/7, cy - e.height/2);
+                    ctx.lineTo(cx - e.width/20, cy - e.height/3);
+                    ctx.closePath();
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(cx + e.width/10, cy - e.height/3);
+                    ctx.lineTo(cx + e.width/7, cy - e.height/2);
+                    ctx.lineTo(cx + e.width/20, cy - e.height/3);
+                    ctx.closePath();
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    // Asas
+                    ctx.save();
+                    ctx.strokeStyle = "#222";
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.bezierCurveTo(cx - e.width*0.7, cy - e.height/2, cx - e.width, cy + e.height/3, cx - e.width*0.8, cy + e.height/1.5);
+                    ctx.moveTo(cx, cy);
+                    ctx.bezierCurveTo(cx + e.width*0.7, cy - e.height/2, cx + e.width, cy + e.height/3, cx + e.width*0.8, cy + e.height/1.5);
+                    ctx.stroke();
+                    ctx.restore();
+                } else if (e.type === 'SNIPER') {
+                    // Olho angelical com asas
+                    // Esclera
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, e.width/2.2, e.height/2.2, 0, 0, 2*Math.PI);
+                    ctx.fillStyle = "#fff";
+                    ctx.shadowColor = "#f1c40f";
+                    ctx.shadowBlur = 12;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // Íris dourada
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/5, 0, 2*Math.PI);
+                    ctx.fillStyle = "#f1c40f";
+                    ctx.fill();
+                    // Pupila
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, e.width/13, 0, 2*Math.PI);
+                    ctx.fillStyle = "#222";
+                    ctx.fill();
+                    // Asas (simples, brancas)
+                    ctx.save();
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - e.width/2.2, cy);
+                    ctx.bezierCurveTo(cx - e.width/1.5, cy - e.height/2, cx - e.width/1.5, cy + e.height/2, cx - e.width/2.2, cy);
+                    ctx.moveTo(cx + e.width/2.2, cy);
+                    ctx.bezierCurveTo(cx + e.width/1.5, cy - e.height/2, cx + e.width/1.5, cy + e.height/2, cx + e.width/2.2, cy);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                // Barra de vida
+                const hp = e.health / e.maxHealth; 
+                ctx.fillStyle = '#2d2d2d'; 
+                ctx.fillRect(e.x, e.y - 10, e.width, 5); 
+                ctx.fillStyle = '#e74c3c'; 
+                ctx.fillRect(e.x, e.y - 10, e.width * hp, 5); 
+                ctx.restore();
+            }); 
+        };
+        function spawnEnemyProjectile(sx, sy, tx, ty, enemy) { 
+            const angle = Math.atan2(ty - sy, tx - sx);
+            const color = enemy.color;
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+
+            enemyProjectiles.push({ 
+                x: sx, y: sy, 
+                vx: Math.cos(angle) * enemy.projectileSpeed, vy: Math.sin(angle) * enemy.projectileSpeed, 
+                size: enemy.type === 'SNIPER' ? 8 : 6, 
+                color: color,
+                bloomColor: `rgba(${r}, ${g}, ${b}, 0.5)`,
+                damage: enemy.projectileDamage || 10,
+            }); 
+        };
+        function updateEnemyProjectiles(deltaTime) { 
+            enemyProjectiles.forEach((p, i) => { 
+                p.x += p.vx * deltaTime; 
+                p.y += p.vy * deltaTime; 
+                if (Math.random() < 0.9) {
+                    particles.push({
+                        x: p.x, y: p.y,
+                        vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40,
+                        size: Math.random() * (p.size * 0.8) + 1,
+                        color: p.bloomColor,
+                        life: 0.6
+                    });
+                }
+                if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) enemyProjectiles.splice(i, 1); 
+            }); 
+        };
+        function drawEnemyProjectiles() { 
+            enemyProjectiles.forEach(p => { 
+                ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 2 * Math.PI); ctx.fill(); 
+            }); 
+        };
+
+        function spawnDamageNumber(text, x, y, color, size) {
+            damageNumbers.push({ text, x, y, color, size, life: 1, vy: -100 });
+        }
+
+        function updateDamageNumbers(deltaTime) {
+            damageNumbers.forEach((dn, i) => {
+                dn.y += dn.vy * deltaTime;
+                dn.life -= deltaTime;
+                if (dn.life <= 0) {
+                    damageNumbers.splice(i, 1);
+                }
+            });
+        }
+
+        function drawDamageNumbers() {
+            damageNumbers.forEach(dn => {
+                ctx.save();
+                ctx.font = `${dn.size}px MedievalSharp`;
+                ctx.fillStyle = dn.color;
+                ctx.globalAlpha = dn.life;
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur = 4;
+                ctx.fillText(dn.text, dn.x, dn.y);
+                ctx.restore();
+            });
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 30; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 300,
+                    vy: (Math.random() - 0.5) * 300,
+                    size: Math.random() * 3 + 1,
+                    color: color,
+                    life: Math.random() * 0.5 + 0.5
+                });
+            }
+        }
+
+        function updateParticles(deltaTime) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.isThunderboltVisual || p.isLightningZap) {
+                    p.life -= deltaTime;
+                } else {
+                    p.x += p.vx * deltaTime;
+                    p.y += p.vy * deltaTime;
+                    p.life -= deltaTime;
+                }
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+        function drawParticles() { 
+            particles.forEach(p => { 
+                ctx.globalAlpha = 1.0;
+                if (p.isThunderboltVisual) {
+                    ctx.strokeStyle = '#f1c40f';
+                    ctx.lineWidth = 2 + Math.random() * 3;
+                    ctx.globalAlpha = p.life / 0.2;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, 0);
+                    ctx.lineTo(p.x, groundY);
+                    ctx.stroke();
+                } else if (p.isLightningZap) {
+                    ctx.strokeStyle = p.color || '#f1c40f';
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = p.life / 0.2;
+                    ctx.beginPath();
+                    ctx.moveTo(p.startX, p.startY);
+                    ctx.lineTo(p.endX, p.endY);
+                    ctx.stroke();
+                } else {
+                    ctx.globalAlpha = p.life; 
+                    ctx.fillStyle = p.color; 
+                    ctx.fillRect(p.x, p.y, p.size, p.size); 
+                }
+                ctx.globalAlpha = 1.0; 
+            }); 
+        };
+        function startNextWave() { 
+            currentWave++; 
+            waveInProgress = true; 
+            allEnemiesSpawned = false;
+            document.getElementById('wave-counter').innerText = currentWave;
+            showWaveAnnouncement(`Wave ${currentWave}`);
+            
+            
+            const enemiesToSpawn = 5 + Math.floor(currentWave *  1.5);
+            let spawned = 0;
+            const spawnInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') {
+                    return;
+                }
+                if (spawned < enemiesToSpawn) {
+                    createEnemy();
+                    spawned++;
+                } else {
+                    allEnemiesSpawned = true;
+                    clearInterval(spawnInterval);
+                }
+            }, 500);
+        };
+        function checkWaveEnd() {
+            if (waveInProgress && allEnemiesSpawned && enemies.length === 0) {
+                waveInProgress = false;
+                if (!isTrainingMode) {
+                    player.score += currentWave * 100;
+                }
+                const title = translations[currentLanguage].waveClear || 'Wave Cleared! Choose a Relic:';
+                displayCardSelection(getCardsByRarity(player.cardChoices), title);
+            }
+        }
+        function updateChosenCardsUI() {
+            const container = document.getElementById('chosen-cards-ui');
+            container.innerHTML = '';
+            const lang = translations[currentLanguage];
+
+            Object.keys(player.chosenCards).forEach(cardId => {
+                const cardData = ALL_CARDS.find(c => c.id === cardId);
+                if (cardData) {
+                    const count = player.chosenCards[cardId];
+                    const title = lang[cardData.titleKey] || cardData.titleKey;
+                    const line = document.createElement('div');
+                    line.innerText = `${title} (${count})`;
+                    container.appendChild(line);
+                }
+            });
+
+            Object.keys(player.ascensions).forEach(ascId => {
+                if (player.ascensions[ascId]) {
+                    const cardData = ALL_CARDS.find(c => c.id === ascId);
+                    if (cardData && cardData.ascension) {
+                        const title = lang[cardData.ascension.titleKey] || cardData.ascension.titleKey;
+                        const line = document.createElement('div');
+                        line.innerText = `ASC: ${title}`;
+                        line.style.color = '#f1c40f'; // Gold color for ascension
+                        container.appendChild(line);
+                    }
+                }
+            });
+
+            Object.keys(player.combinations).forEach(comboId => {
+                if (player.combinations[comboId]) {
+                    const comboData = COMBINATIONS.find(c => c.id === comboId);
+                    if (comboData) {
+                        const title = lang[comboData.titleKey] || comboData.titleKey;
+                        const line = document.createElement('div');
+                        line.innerText = `COMBO: ${title}`;
+                        line.style.color = '#e74c3c'; // Red-ish for combos
+                        container.appendChild(line);
+                    }
+                }
+            });
+        }
+        function checkCollisions() {
+             for (let pIndex = projectiles.length - 1; pIndex >= 0; pIndex--) {
+                const p = projectiles[pIndex];
+                if (!p) continue;
+
+                let hit = false;
+                for (let eIndex = enemies.length - 1; eIndex >= 0; eIndex--) {
+                    const e = enemies[eIndex];
+                     if (p.x > e.x && p.x < e.x + e.width && p.y > e.y && p.y < e.y + e.height) {
+                        hit = true;
+                        const isCrit = Math.random() < player.critChance;
+                        const damageDealt = isCrit ? Math.floor(p.damage * player.critDamage) : p.damage;
+
+                        e.health -= damageDealt;
+                        spawnDamageNumber(damageDealt, e.x + e.width / 2, e.y, isCrit ? '#f1c40f' : 'white', isCrit ? 32 : 24);
+
+                        if (player.lifeSteal > 0) player.health = Math.min(player.maxHealth, player.health + damageDealt * player.lifeSteal);
+
+                        if (!player.projectilesPierce) {
+                            projectiles.splice(pIndex, 1);
+                        }
+
+                        // Chain Lightning
+                        const canChain = player.chainLightning && (!p.isSplit || player.splitProjectilesChain);
+                        if (canChain && Math.random() < player.chainLightning.chance) {
+                            let currentTarget = e;
+                            let jumpsLeft = player.chainLightning.jumps;
+                            const hitByChain = new Set([e]);
+                            let chainDmg = player.chainLightning.fullDamage ? damageDealt : damageDealt * 0.7;
+
+                            while (jumpsLeft > 0) {
+                                let nextTarget = null;
+                                let minDistance = Infinity;
+                                enemies.forEach(otherE => {
+                                    if (!hitByChain.has(otherE) && otherE.health > 0) {
+                                        const dist = Math.hypot(currentTarget.x - otherE.x, currentTarget.y - otherE.y);
+                                        if (dist < 250 && dist < minDistance) { // Chain radius
+                                            minDistance = dist;
+                                            nextTarget = otherE;
+                                        }
+                                    }
+                                });
+
+                                if (nextTarget) {
+                                    particles.push({ isLightningZap: true, life: 0.2, startX: currentTarget.x + currentTarget.width / 2, startY: currentTarget.y + currentTarget.height / 2, endX: nextTarget.x + nextTarget.width / 2, endY: nextTarget.y + nextTarget.height / 2, color: '#00ffff' });
+                                    const currentChainDamage = Math.floor(chainDmg);
+                                    nextTarget.health -= currentChainDamage;
+                                    spawnDamageNumber(currentChainDamage, nextTarget.x + nextTarget.width / 2, nextTarget.y, '#00ffff', 20);
+                                    hitByChain.add(nextTarget);
+                                    currentTarget = nextTarget;
+                                    jumpsLeft--;
+                                    chainDmg *= 0.7; // damage decay for subsequent jumps
+                                } else {
+                                    break; // no more targets in range
+                                }
+                            }
+                        }
+
+                        if (player.projectilesExplode) {
+                            createExplosion(p.x, p.y, '#ff8c00');
+                            enemies.forEach(otherE => {
+                                if (otherE !== e) {
+                                    const dist = Math.hypot(p.x - (otherE.x + otherE.width / 2), p.y - (otherE.y + otherE.height / 2));
+                                    if (dist < 80) // Explosion radius
+                                        otherE.health -= damageDealt / 2; // Explosion damage
+                                    spawnDamageNumber(Math.floor(damageDealt / 2), otherE.x + otherE.width / 2, otherE.y, '#ff8c00', 20);
+                                }
+                            });
+                        }
+
+                        if (e.health <= 0) {
+                            createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color);
+                            enemies.splice(eIndex, 1);
+                            player.xp += e.xp;
+                            if (!isTrainingMode) {
+                                player.score += e.points || 0;
+                            }
+                            updateGameUI();
+                        }
+
+                        if (hit && !player.projectilesPierce) break; // break from enemies loop
+                    }
+                }
+            }
+             enemyProjectiles.forEach((p, pIndex) => { if (!player.isInvulnerable && p.x > player.x && p.x < player.x + player.width && p.y > player.y && p.y < player.y + player.height) { if(player.hasBarrier && player.barrierReady) { player.barrierReady = false; player.lastBarrierTime = performance.now(); if (player.barrierReflects) { p.vx *= -1.5; p.vy *= -1.5; p.color = '#00ffff'; p.damage *= 2; projectiles.push(p); } } else { player.health -= p.damage; player.isInvulnerable = true; setTimeout(() => { player.isInvulnerable = false; }, 1000); } enemyProjectiles.splice(pIndex, 1); updateGameUI(); } });
+             enemies.forEach(e => {
+                 if (e.attackType === 'melee' && !player.isInvulnerable) {
+                     if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
+                        if(player.hasBarrier && player.barrierReady) { 
+                            player.barrierReady = false; 
+                            player.lastBarrierTime = performance.now(); 
+                        } else {
+                            player.health -= e.damage;
+                            player.isInvulnerable = true;
+                            setTimeout(() => { player.isInvulnerable = false; }, 1000);
+                        }
+                        updateGameUI();
+                     }
+                 }
+             });
+             if (player.health <= 0) {
+                if (!isTrainingMode) {
+                    finalScore = player.score;
+                    nameInputScreen.classList.remove('hidden');
+                    gameState = 'GAMEOVER';
+                } else {
+                    mainMenu.classList.remove('hidden');
+                    displayMainMenuLeaderboard();
+                    gameState = 'MENU';
+                }
+             }
+        };
+        function updateGameUI() {
+            document.getElementById('health-bar').style.width = `${Math.max(0, (player.health / player.maxHealth) * 100)}%`;
+            while (player.xp >= player.xpToNextLevel) {
+                player.level++;
+                player.xp -= player.xpToNextLevel;
+                player.xpToNextLevel *= 1.5;
+                player.maxHealth += 5;
+                player.health += 5;
+                player.projectileDamage += 1;
+                player.attackSpeed *= 0.98;
+            }
+            document.getElementById('xp-bar').style.width = `${(player.xp / player.xpToNextLevel) * 100}%`;
+            document.getElementById('player-level').innerText = `${translations[currentLanguage].level}: ${player.level}`;
+            scoreCounter.innerText = player.score;
+        };
+        function showWaveAnnouncement(text) { 
+            waveAnnouncement.innerText = text; 
+            waveAnnouncement.classList.add('show'); 
+            setTimeout(() => { waveAnnouncement.classList.remove('show'); }, 2500); 
+        };
+        function initGame(isTraining = false) { 
+            mainMenu.classList.add('hidden');
+            gameState = 'PLAYING';
+            isTrainingMode = isTraining;
+            trainingModeIndicator.classList.toggle('hidden', !isTraining);
+
+            resizeCanvas();
+            createPlatforms();
+            Object.assign(player, { 
+                x: canvas.width / 2, y: groundY - 100, health: 100, maxHealth: 100, level: 1, xp: 0, xpToNextLevel: 100, score: 0, speed: 500, attackSpeed: 500, projectileDamage: 10, projectileSize: 8, lifeSteal: 0, critChance: 0.05, critDamage: 1.5, maxJumps: 1, cardChoices: 3, revives: 0, hasBarrier: false, hasThunderbolt: false, isInvulnerable: false, isDashing: false, canDash: true, chosenCards: {}, ascensions: {}, combinations: {}, healthRegen: 0, projectileMaxBounces: 0, projectilesPierce: false, hasResonanceAscension: false, barrierReflects: false, thunderboltLeavesAoe: false, hasLightningShield: false, lastLightningShieldZap: 0, extraProjectiles: 0, chainLightning: null, projectilesExplode: false, arcaneOrbs: { count: 0, angle: 0, powerUp: false }, projectileSpeedMultiplier: 1, projectilesAccelerate: false, splitProjectilesChain: false, attackSpeedAffectsOrbs: false, pixelScale: 2.0 }); // <--- Reset ao iniciar o jogo
+            updateChosenCardsUI();
+            enemies = []; projectiles = []; enemyProjectiles = []; particles = []; damageNumbers = [];
+            currentWave = 0; updateGameUI(); startNextWave(); 
+        };
+
+        function toggleDebugMenu() {
+            debugMode = !debugMode;
+            if (debugMode) {
+                gameState = 'DEBUG';
+                populateDebugMenu();
+                debugMenu.classList.remove('hidden');
+            } else {
+                gameState = 'PLAYING';
+                debugMenu.classList.add('hidden');
+            }
+        }
+
+        function createPlatforms() {
+            platforms = [
+                { x: 200, y: groundY - 150, width: 250, height: 20 },
+                { x: canvas.width - 450, y: groundY - 150, width: 250, height: 20 },
+                { x: canvas.width / 2 - 150, y: groundY - 300, width: 300, height: 20 }
+            ];
+        }
+
+        function populateGrimoire(tab = 'ascensions') {
+            const content = document.getElementById('grimoire-content');
+            content.innerHTML = '';
+            const lang = translations[currentLanguage];
+
+            if (tab === 'ascensions') {
+                // Cards & Ascensions
+                let cardHtml = `<div class="grimoire-section"><h2 class="grimoire-title">${lang.grimoire || 'Cards'}</h2>`;
+                ALL_CARDS.forEach(card => {
+                    cardHtml += `
+                        <div class="grimoire-card rarity-${card.rarity}">
+                            <div class="grimoire-card-name">${lang[card.titleKey]}</div>
+                            <div class="grimoire-card-desc">${lang[card.descriptionKey]}</div>
+                    `;
+                    if (card.ascension) {
+                        cardHtml += `
+                            <div class="grimoire-ascension">
+                                <div class="grimoire-ascension-name">${lang[card.ascension.titleKey]} (x${card.ascension.threshold})</div>
+                                <div class="grimoire-card-desc">${lang[card.ascension.descriptionKey]}</div>
+                            </div>
+                        `;
+                    }
+                    cardHtml += `</div>`;
+                });
+                cardHtml += `</div>`;
+                content.innerHTML += cardHtml;
+
+                // Combinations
+                let comboHtml = `<div class="grimoire-section"><h2 class="grimoire-title">${lang.combo_title || 'Combinations'}</h2>`;
+                COMBINATIONS.forEach(combo => {
+                    const reqs = combo.required.map(req => {
+                        const card = ALL_CARDS.find(c => c.id === req.id);
+                        return `${lang[card.titleKey]} (x${req.count})`;
+                    }).join(' + ');
+
+                    comboHtml += `
+                        <div class="grimoire-card grimoire-combo">
+                            <div class="grimoire-card-name">${lang[combo.titleKey]}</div>
+                            <div class="grimoire-card-desc">${lang[combo.descriptionKey]}</div>
+                            <div class="grimoire-combo-reqs">Requires: ${reqs}</div>
+                        </div>
+                    `;
+                });
+                comboHtml += `</div>`;
+                content.innerHTML += comboHtml;
+            } else if (tab === 'monsters') {
+                populateMonsterGrimoire();
+            }
+        }
+
+        // Traduções de monstros
+        const monsterDescriptions = {
+            en: {
+                GRUNT: {
+                    name: "Grunt (Demon Eye)",
+                    desc: "A floating demonic eye. Fires slow projectiles at you. Basic but dangerous in numbers."
+                },
+                TANK: {
+                    name: "Tank (Horned Eye)",
+                    desc: "A large, horned demon eye. Tough and resilient, fires stronger projectiles."
+                },
+                RUSHER: {
+                    name: "Rusher (Bat)",
+                    desc: "A fast, aggressive bat. Rushes directly at you to deal melee damage."
+                },
+                SNIPER: {
+                    name: "Sniper (Angel Eye)",
+                    desc: "A golden angelic eye with wings. Fires fast, precise projectiles from afar."
+                }
+            },
+            pt: {
+                GRUNT: {
+                    name: "Grunt (Olho Demoníaco)",
+                    desc: "Um olho demoníaco flutuante. Atira projéteis lentos. Simples, mas perigoso em grupo."
+                },
+                TANK: {
+                    name: "Tank (Olho com Chifres)",
+                    desc: "Um grande olho demoníaco com chifres. Muito resistente, dispara projéteis mais fortes."
+                },
+                RUSHER: {
+                    name: "Rusher (Morcego)",
+                    desc: "Um morcego rápido e agressivo. Avança diretamente para causar dano corpo a corpo."
+                },
+                SNIPER: {
+                    name: "Sniper (Olho Angelical)",
+                    desc: "Um olho angelical dourado com asas. Dispara projéteis rápidos e precisos de longe."
+                }
+            }
+        };
+
+        // Renderiza o visual do monstro em um canvas
+        function renderMonsterVisual(type, canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Centraliza e escala
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            let e = { x: cx - 30, y: cy - 24, width: 60, height: 48, type: type };
+            // Copia propriedades do tipo real
+            Object.assign(e, enemyTypes[type]);
+            // Chama o mesmo desenho do jogo, mas adaptado
+            ctx.save();
+            // Redefine cores para visualização
+            e.color = enemyTypes[type].color;
+            // Desenha usando lógica semelhante ao drawEnemies
+            if (type === 'GRUNT') {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, e.width/2, e.height/2, 0, 0, 2*Math.PI);
+                ctx.fillStyle = "#fff";
+                ctx.shadowColor = "#c0392b";
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/4, 0, 2*Math.PI);
+                ctx.fillStyle = "#c0392b";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/10, 0, 2*Math.PI);
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                for (let i = 0; i < 5; i++) {
+                    const angle = Math.PI * 2 * i / 5;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx + Math.cos(angle) * e.width/2, cy + Math.sin(angle) * e.height/2);
+                    ctx.strokeStyle = "#e57373";
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+            } else if (type === 'TANK') {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, e.width/2, e.height/2, 0, 0, 2*Math.PI);
+                ctx.fillStyle = "#f8e1e1";
+                ctx.shadowColor = "#8e44ad";
+                ctx.shadowBlur = 16;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/4, 0, 2*Math.PI);
+                ctx.fillStyle = "#8e44ad";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/11, 0, 2*Math.PI);
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                for (let i = 0; i < 8; i++) {
+                    const angle = Math.PI * 2 * i / 8;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx + Math.cos(angle) * e.width/2, cy + Math.sin(angle) * e.height/2);
+                    ctx.strokeStyle = "#b71c1c";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                // Chifres
+                ctx.save();
+                ctx.translate(cx, cy - e.height/2);
+                ctx.rotate(-0.4);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-10, -18);
+                ctx.lineTo(-5, 0);
+                ctx.closePath();
+                ctx.fillStyle = "#333";
+                ctx.fill();
+                ctx.restore();
+                ctx.save();
+                ctx.translate(cx, cy - e.height/2);
+                ctx.rotate(0.4);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(10, -18);
+                ctx.lineTo(5, 0);
+                ctx.closePath();
+                ctx.fillStyle = "#333";
+                ctx.fill();
+                ctx.restore();
+            } else if (type === 'RUSHER') {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, e.width/3, e.height/2.5, 0, 0, 2*Math.PI);
+                ctx.fillStyle = "#222";
+                ctx.shadowColor = "#27ae60";
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy - e.height/4, e.width/5, e.height/5, 0, 0, 2*Math.PI);
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx - e.width/12, cy - e.height/4, e.width/18, 0, 2*Math.PI);
+                ctx.arc(cx + e.width/12, cy - e.height/4, e.width/18, 0, 2*Math.PI);
+                ctx.fillStyle = "#e74c3c";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(cx - e.width/10, cy - e.height/3);
+                ctx.lineTo(cx - e.width/7, cy - e.height/2);
+                ctx.lineTo(cx - e.width/20, cy - e.height/3);
+                ctx.closePath();
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(cx + e.width/10, cy - e.height/3);
+                ctx.lineTo(cx + e.width/7, cy - e.height/2);
+                ctx.lineTo(cx + e.width/20, cy - e.height/3);
+                ctx.closePath();
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                ctx.save();
+                ctx.strokeStyle = "#222";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.bezierCurveTo(cx - e.width*0.7, cy - e.height/2, cx - e.width, cy + e.height/3, cx - e.width*0.8, cy + e.height/1.5);
+                ctx.moveTo(cx, cy);
+                ctx.bezierCurveTo(cx + e.width*0.7, cy - e.height/2, cx + e.width, cy + e.height/3, cx + e.width*0.8, cy + e.height/1.5);
+                ctx.stroke();
+                ctx.restore();
+            } else if (type === 'SNIPER') {
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, e.width/2.2, e.height/2.2, 0, 0, 2*Math.PI);
+                ctx.fillStyle = "#fff";
+                ctx.shadowColor = "#f1c40f";
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/5, 0, 2*Math.PI);
+                ctx.fillStyle = "#f1c40f";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx, cy, e.width/13, 0, 2*Math.PI);
+                ctx.fillStyle = "#222";
+                ctx.fill();
+                ctx.save();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(cx - e.width/2.2, cy);
+                ctx.bezierCurveTo(cx - e.width/1.5, cy - e.height/2, cx - e.width/1.5, cy + e.height/2, cx - e.width/2.2, cy);
+                ctx.moveTo(cx + e.width/2.2, cy);
+                ctx.bezierCurveTo(cx + e.width/1.5, cy - e.height/2, cx + e.width/1.5, cy + e.height/2, cx + e.width/2.2, cy);
+                ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        // Renderiza o conteúdo do grimório de monstros
+        function populateMonsterGrimoire() {
+            const content = document.getElementById('grimoire-content');
+            content.innerHTML = '';
+            const lang = currentLanguage;
+            const monsters = ['GRUNT', 'TANK', 'RUSHER', 'SNIPER'];
+            let html = `<div class="grimoire-section"><h2 class="grimoire-title">Monstros</h2>`;
+            monsters.forEach(type => {
+                const m = monsterDescriptions[lang][type];
+                html += `
+                    <div class="grimoire-card flex items-center mb-8">
+                        <canvas class="monster-visual mr-6" width="120" height="96" style="background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid #444;"></canvas>
+                        <div>
+                            <div class="grimoire-card-name mb-2">${m.name}</div>
+                            <div class="grimoire-card-desc">${m.desc}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            content.innerHTML = html;
+            // Desenha o visual dos monstros
+            document.querySelectorAll('.monster-visual').forEach((canvas, idx) => {
+                renderMonsterVisual(monsters[idx], canvas);
+            });
+        }
+
+        // Eventos das abas do grimório
+        document.getElementById('grimoire-tab-ascensions').addEventListener('click', () => {
+            populateGrimoire('ascensions');
+            document.getElementById('grimoire-tab-ascensions').classList.add('bg-purple-700');
+            document.getElementById('grimoire-tab-ascensions').classList.remove('bg-gray-700');
+            document.getElementById('grimoire-tab-monsters').classList.remove('bg-green-700');
+            document.getElementById('grimoire-tab-monsters').classList.add('bg-gray-700');
+        });
+        document.getElementById('grimoire-tab-monsters').addEventListener('click', () => {
+            populateGrimoire('monsters');
+            document.getElementById('grimoire-tab-monsters').classList.add('bg-green-700');
+            document.getElementById('grimoire-tab-monsters').classList.remove('bg-gray-700');
+            document.getElementById('grimoire-tab-ascensions').classList.remove('bg-purple-700');
+            document.getElementById('grimoire-tab-ascensions').classList.add('bg-gray-700');
+        });
+
+        // Ao abrir o grimório, sempre mostra a aba de ascensões por padrão
+        grimoireBtn.addEventListener('click', () => {
+            populateGrimoire('ascensions');
+            document.getElementById('grimoire-tab-ascensions').classList.add('bg-purple-700');
+            document.getElementById('grimoire-tab-ascensions').classList.remove('bg-gray-700');
+            document.getElementById('grimoire-tab-monsters').classList.remove('bg-green-700');
+            document.getElementById('grimoire-tab-monsters').classList.add('bg-gray-700');
+            grimoireScreen.classList.remove('hidden');
+            mainMenu.classList.add('hidden');
+            gameState = 'GRIMOIRE';
+        });
+        pauseGrimoireBtn.addEventListener('click', () => {
+            populateGrimoire('ascensions');
+            document.getElementById('grimoire-tab-ascensions').classList.add('bg-purple-700');
+            document.getElementById('grimoire-tab-ascensions').classList.remove('bg-gray-700');
+            document.getElementById('grimoire-tab-monsters').classList.remove('bg-green-700');
+            document.getElementById('grimoire-tab-monsters').classList.add('bg-gray-700');
+            grimoireScreen.classList.remove('hidden');
+            pauseMenu.classList.add('hidden');
+            gameState = 'GRIMOIRE';
+        });
+
+        // Adicione de volta a função applyDebugStats antes dos event listeners:
+
+        function applyDebugStats() {
+            player.health = parseInt(document.getElementById('debug-health').value, 10) || player.health;
+            player.maxHealth = parseInt(document.getElementById('debug-maxHealth').value, 10) || player.maxHealth;
+            player.projectileDamage = parseInt(document.getElementById('debug-damage').value, 10) || player.projectileDamage;
+            player.speed = parseInt(document.getElementById('debug-speed').value, 10) || player.speed;
+            player.attackSpeed = parseInt(document.getElementById('debug-attackSpeed').value, 10) || player.attackSpeed;
+            updateGameUI();
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', resizeCanvas);
+        startGameBtn.addEventListener('click', () => initGame(false));
+        trainingModeBtn.addEventListener('click', () => initGame(true));
+        grimoireBtn.addEventListener('click', () => {
+            populateGrimoire();
+            grimoireScreen.classList.remove('hidden');
+            mainMenu.classList.add('hidden');
+            gameState = 'GRIMOIRE';
+        });
+        closeGrimoireBtn.addEventListener('click', async () => {
+            grimoireScreen.classList.add('hidden');
+            if (previousGameState !== null) { // Came from a paused game
+                pauseMenu.classList.remove('hidden');
+                gameState = 'PAUSED';
+            } else { // Came from the main menu
+                mainMenu.classList.remove('hidden');
+                await displayMainMenuLeaderboard();
+                gameState = 'MENU';
+            }
+        });
+        langPtBtn.addEventListener('click', () => { currentLanguage = 'pt'; updateUIText(); });
+        langEnBtn.addEventListener('click', () => { currentLanguage = 'en'; updateUIText(); });
+        applyStatsBtn.addEventListener('click', applyDebugStats);
+
+        submitNameBtn.addEventListener('click', async () => {
+            const rawPlayerName = nameInputField.value.trim();
+            const playerName = sanitizeHTML(rawPlayerName) || "Anonymous Mage";
+            await saveScoreToLeaderboard(playerName, finalScore);
+            nameInputScreen.classList.add('hidden');
+            mainMenu.classList.remove('hidden');
+            await displayMainMenuLeaderboard();
+            gameState = 'MENU';
+        });
+
+        leaderboardPrevBtn.addEventListener('click', () => displayMainMenuLeaderboard('prev'));
+        leaderboardNextBtn.addEventListener('click', () => displayMainMenuLeaderboard('next'));
+
+        resumeBtn.addEventListener('click', () => togglePause(false));
+        quitToMenuBtn.addEventListener('click', () => {
+            togglePause(false); // Unpause first to clear state
+            mainMenu.classList.remove('hidden');
+            displayMainMenuLeaderboard();
+            gameState = 'MENU';
+        });
+        pauseGrimoireBtn.addEventListener('click', () => {
+            populateGrimoire();
+            grimoireScreen.classList.remove('hidden');
+            pauseMenu.classList.add('hidden');
+            gameState = 'GRIMOIRE';
+        });
+
+        window.addEventListener('keydown', (e) => { 
+            keys[e.code] = true; 
+            if (e.code === 'ShiftLeft') handleDash(); 
+            if (e.code === 'KeyQ') { autoAttack = !autoAttack; autoAttackIcon.classList.toggle('hidden', !autoAttack); }
+            if (e.code === 'KeyP' && isTrainingMode) { toggleDebugMenu(); }
+            if (e.code === 'Escape' && (gameState === 'PLAYING' || gameState === 'DEBUG' || gameState === 'PAUSED')) {
+                togglePause(gameState !== 'PAUSED');
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+        canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); mouse.x = e.clientX - rect.left; mouse.y = e.clientY - rect.top; });
+        canvas.addEventListener('mousedown', (e) => { if (e.button === 0) mouse.down = true; });
+        canvas.addEventListener('mouseup', (e) => { if (e.button === 0) mouse.down = false; });
+        
+        function updateOrbs(deltaTime) {
+            if (player.arcaneOrbs.count === 0) return;
+
+            let rotationSpeed = 1.5; // radians per second
+            if (player.attackSpeedAffectsOrbs) {
+                rotationSpeed *= (500 / player.attackSpeed);
+            }
+            if (player.arcaneOrbs.powerUp) {
+                rotationSpeed *= 1.5;
+            }
+            player.arcaneOrbs.angle += rotationSpeed * deltaTime;
+
+            const radius = 100;
+            const orbBaseSize = player.arcaneOrbs.powerUp ? 15 : 10;
+            const orbDamage = player.arcaneOrbs.powerUp ? 10 : 5;
+
+            for (let i = 0; i < player.arcaneOrbs.count; i++) {
+                const angle = player.arcaneOrbs.angle + (i * (2 * Math.PI / player.arcaneOrbs.count));
+                const orbX = player.x + player.width / 2 + Math.cos(angle) * radius;
+                const orbY = player.y + player.height / 2 + Math.sin(angle) * radius;
+
+                for (let eIndex = enemies.length - 1; eIndex >= 0; eIndex--) {
+                    const e = enemies[eIndex];
+                    const dist = Math.hypot(orbX - (e.x + e.width / 2), orbY - (e.y + e.height / 2));
+                    if (dist < orbBaseSize + e.width / 2) {
+                        e.health -= orbDamage * deltaTime * 5; // Damage over time
+                        spawnDamageNumber(Math.ceil(orbDamage * deltaTime * 5), e.x + e.width / 2, e.y, '#9b59b6', 18);
+                        if (e.health <= 0) {
+                            createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color);
+                            player.xp += e.xp;
+                            if (!isTrainingMode) {
+                                player.score += e.points || 0;
+                            }
+                            enemies.splice(eIndex, 1);
+                            updateGameUI();
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawOrbs() {
+            if (player.arcaneOrbs.count === 0) return;
+
+            const radius = 100;
+            const orbSize = player.arcaneOrbs.powerUp ? 15 : 10;
+            
+            ctx.save();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#9b59b6';
+
+            for (let i = 0; i < player.arcaneOrbs.count; i++) {
+                const angle = player.arcaneOrbs.angle + (i * (2 * Math.PI / player.arcaneOrbs.count));
+                const orbX = player.x + player.width / 2 + Math.cos(angle) * radius;
+                const orbY = player.y + player.height / 2 + Math.sin(angle) * radius;
+                
+                ctx.fillStyle = '#9b59b6';
+                ctx.beginPath();
+                ctx.arc(orbX, orbY, orbSize, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function startArcadeMusic() {
+            if (!window.audioContext) {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const ctx = window.audioContext;
+            const melody = [220, 220, 330, 220, 440, 0, 440];
+            let startTime = ctx.currentTime;
+
+            melody.forEach((freq, i) => {
+                if (freq) {
+                    let osc = ctx.createOscillator();
+                    let gain = ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.value = freq;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    let noteDuration = 0.3;
+                    let time = startTime + i * noteDuration;
+                    osc.start(time);
+                    osc.stop(time + noteDuration);
+                }
+            });
+            setTimeout(startArcadeMusic, melody.length * 300);
+        }
+
+        // =================================================================
+        // LOOP PRINCIPAL
+        // =================================================================
+        function gameLoop(timestamp) {
+            requestAnimationFrame(gameLoop);
+            const now = timestamp;
+            const elapsed = now - then;
+
+            if (elapsed > FPS_INTERVAL) {
+                then = now - (elapsed % FPS_INTERVAL);
+                const deltaTime = elapsed / 1000;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (gameState === 'MENU' || gameState === 'GRIMOIRE' || gameState === 'GAMEOVER') {
+                    drawBackground();
+                    drawGroundAndWalls();
+                } else { // Game world is visible (PLAYING, PAUSED, DEBUG, etc.)
+                     if (gameState === 'PLAYING' || gameState === 'DEBUG') {
+                        handleJump();
+                        updatePlayer(now, deltaTime);
+                        updateOrbs(deltaTime);
+                        updateProjectiles(deltaTime);
+                        updateEnemyProjectiles(deltaTime);
+                        updateEnemies(now, deltaTime);
+                        checkCollisions();
+                        checkWaveEnd();
+                        
+                        if ((autoAttack || mouse.down) && now - lastAttackTime > player.attackSpeed) {
+                            if (player.hasResonanceAscension) {
+                                const playerCenterX = player.x + player.width / 2;
+                                const playerCenterY = player.y + player.height / 2;
+                                const angle = Math.atan2(mouse.y - playerCenterY, mouse.x - playerCenterX);
+                                const staffTotalLength = 70;
+                                const beamStartX = playerCenterX + Math.cos(angle) * staffTotalLength;
+                                const beamStartY = playerCenterY + Math.sin(angle) * staffTotalLength;
+                                
+
+                                const beamLength = canvas.width + canvas.height;
+                                const beamEndX = beamStartX + Math.cos(angle) * beamLength;
+                                const beamEndY = beamStartY + Math.sin(angle) * beamLength;
+
+                                const beamVecX = beamEndX - beamStartX;
+                                const beamVecY = beamEndY - beamStartY;
+                                const beamActualLength = Math.hypot(beamVecX, beamVecY);
+
+                                if (beamActualLength > 1) {
+                                    for (let i = enemies.length - 1; i >= 0; i--) {
+                                        const e = enemies[i];
+                                        const enemyCenterX = e.x + e.width / 2;
+                                        const enemyCenterY = e.y + e.height / 2;
+
+                                        // Check if enemy is roughly between start and end points (dot product check)
+                                        const dot1 = (enemyCenterX - beamStartX) * beamVecX + (enemyCenterY - beamStartY) * beamVecY;
+                                        
+                                        if (dot1 >= 0) {
+                                            const distToLine = Math.abs(beamVecY * enemyCenterX - beamVecX * enemyCenterY + beamEndX * beamStartY - beamEndY * beamStartX) / beamActualLength;
+                                            if (distToLine < e.width / 2) {
+                                                const damage = Math.abs(player.projectileDamage);
+                                                e.health -= damage;
+                                                spawnDamageNumber(damage, enemyCenterX, e.y, 'cyan', 22);
+
+                                                if (e.health <= 0) {
+                                                    createExplosion(enemyCenterX, enemyCenterY, e.color);
+                                                    enemies.splice(i, 1);
+                                                    player.xp += e.xp;
+                                                    if (!isTrainingMode) {
+                                                        player.score += e.points || 0;
+                                                    }
+                                                    updateGameUI();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                lastAttackTime = now;
+                            } else if (player.extraProjectiles > 0) {
+                                const playerCenterX = player.x + player.width / 2;
+                                const playerCenterY = player.y + player.height / 2;
+                                const angle = Math.atan2(mouse.y - playerCenterY, mouse.x - playerCenterX);
+                                const staffTotalLength = 70; // From drawPlayer: 10 offset + 60 length
+                                
+                                const projectileStartX = playerCenterX + Math.cos(angle) * staffTotalLength;
+                                const projectileStartY = playerCenterY + Math.sin(angle) * staffTotalLength;
+
+                                // Main projectile
+                                spawnProjectile(projectileStartX, projectileStartY, mouse.x, mouse.y);
+                                
+                                // Handle Split Shot (extra projectiles)
+                                const spreadAngle = 0.2; // radians between each extra projectile
+                                for (let i = 1; i <= player.extraProjectiles; i++) {
+                                    const side = (i % 2 === 1) ? 1 : -1;
+                                    const angleOffset = Math.ceil(i / 2) * spreadAngle * side;
+                                    const newAngle = angle + angleOffset;
+                                    const targetX = playerCenterX + Math.cos(newAngle) * 1000;
+                                    const targetY = playerCenterY + Math.sin(newAngle) * 1000;
+                                    spawnProjectile(projectileStartX, projectileStartY, targetX, targetY, { isSplit: true });
+                                }
+                                lastAttackTime = now;
+                            } else {
+                                const playerCenterX = player.x + player.width / 2;
+                                const playerCenterY = player.y + player.height / 2;
+                                const angle = Math.atan2(mouse.y - playerCenterY, mouse.x - playerCenterX);
+                                const staffTotalLength = 70; // From drawPlayer: 10 offset + 60 length
+                                
+                                const projectileStartX = playerCenterX + Math.cos(angle) * staffTotalLength;
+                                const projectileStartY = playerCenterY + Math.sin(angle) * staffTotalLength;
+
+                                spawnProjectile(projectileStartX, projectileStartY, mouse.x, mouse.y);
+                                lastAttackTime = now;
+                            }
+                        }
+                    }
+                    // Some effects might continue
+                    updateParticles(deltaTime);
+                    updateDamageNumbers(deltaTime);
+                    // Always draw the game world if not in a full-screen menu
+                    drawBackground();
+                    drawGroundAndWalls();
+                    drawPlatforms();
+                    drawParticles();
+                    drawOrbs();
+                    if (player.hasResonanceAscension && (autoAttack || mouse.down) && (gameState === 'PLAYING' || gameState === 'PAUSED' || gameState === 'DEBUG')) {
+                        drawLightningBeam();
+                    }
+                    drawProjectiles();
+                    drawEnemyProjectiles();
+                    drawEnemies();
+                    drawPlayer();
+                    drawDamageNumbers();
+                }
+            }
+        }
+
+        window.onload = async () => {
+            resizeCanvas();
+            generateStars();
+            // generateStaticTrees(); // já chamado em resizeCanvas
+            updateUIText();
+            await displayMainMenuLeaderboard();
+            startArcadeMusic();
+            then = performance.now();
+            gameLoop(then);
+        };
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            generateStars();
+            // generateStaticTrees(); // já chamado em resizeCanvas
+        });
+
+        // Adicione antes dos event listeners, junto com outras funções utilitárias:
+
+        async function displayMainMenuLeaderboard(direction = 'first') {
+            const lang = translations[currentLanguage];
+            const title = lang.leaderboard_title || 'Leaderboard';
+            let q;
+
+            if (direction === 'next' && leaderboardLastDoc) {
+                q = query(leaderboardCollection, orderBy("score", "desc"), startAfter(leaderboardLastDoc), limit(MAX_LEADERBOARD_ENTRIES));
+                leaderboardPage++;
+            } else if (direction === 'prev' && leaderboardFirstDoc) {
+                // Firestore doesn't have endBefore, so we query backwards and reverse the result
+                q = query(leaderboardCollection, orderBy("score", "asc"), startAfter(leaderboardFirstDoc), limit(MAX_LEADERBOARD_ENTRIES));
+                leaderboardPage--;
+            } else {
+                q = query(leaderboardCollection, orderBy("score", "desc"), limit(MAX_LEADERBOARD_ENTRIES));
+                leaderboardPage = 1;
+            }
+
+            try {
+                const querySnapshot = await getDocs(q);
+                const scores = [];
+                querySnapshot.forEach(doc => scores.push(doc.data()));
+
+                if (direction === 'prev') {
+                    scores.reverse(); // Correct the order for previous page
+                }
+
+                leaderboardFirstDoc = querySnapshot.docs[0] || null;
+                leaderboardLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1] || null;
+
+                leaderboardContent.innerHTML = `<h2 class="text-4xl font-medieval text-yellow-300 mb-6 text-center">${title}</h2>`;
+                
+                if (scores.length === 0 && leaderboardPage === 1) {
+                    leaderboardContent.innerHTML += `<p class="text-center text-gray-400">No scores yet. Be the first!</p>`;
+                    leaderboardPrevBtn.disabled = true;
+                    leaderboardNextBtn.disabled = true;
+                } else {
+                    const list = document.createElement('ol');
+                    list.className = 'list-decimal list-inside space-y-2 text-lg';
+                    list.start = (leaderboardPage - 1) * MAX_LEADERBOARD_ENTRIES + 1;
+                    scores.forEach(entry => {
+                        const item = document.createElement('li');
+                        item.className = 'flex justify-between items-center p-2 bg-gray-800 rounded';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'font-semibold text-white truncate pr-2';
+                        nameSpan.innerText = entry.name;
+
+                        const scoreAndDate = document.createElement('div');
+                        scoreAndDate.className = 'text-right flex-shrink-0';
+
+                        const scoreSpan = document.createElement('span');
+                        scoreSpan.className = 'font-bold text-yellow-400';
+                        scoreSpan.innerText = entry.score.toLocaleString();
+                        
+                        const dateSpan = document.createElement('span');
+                        dateSpan.className = 'text-sm text-gray-500 ml-4';
+                        dateSpan.innerText = new Date(entry.date).toLocaleDateString();
+
+                        scoreAndDate.appendChild(scoreSpan);
+                        scoreAndDate.appendChild(dateSpan);
+
+                        item.appendChild(nameSpan);
+                        item.appendChild(scoreAndDate);
+                        list.appendChild(item);
+                    });
+                    leaderboardContent.appendChild(list);
+
+                    leaderboardPrevBtn.disabled = leaderboardPage <= 1;
+                    leaderboardNextBtn.disabled = querySnapshot.docs.length < MAX_LEADERBOARD_ENTRIES;
+                }
+                leaderboardPageIndicator.innerText = `Page ${leaderboardPage}`;
+
+            } catch (error) {
+                console.error("Error getting leaderboard from Firebase: ", error);
+                leaderboardContent.innerHTML += `<p class="text-center text-red-400">Error loading scores.</p>`;
+            }
+        }
+
+    </script>
+</body>
+</html>
